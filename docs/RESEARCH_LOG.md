@@ -116,11 +116,36 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 ## E4 — Context 512
 
 - **Date:** 2026-08-31
-- **Status:** planned
+- **Status:** completed
 - **Question:** does doubling usable context improve held-out prediction and longer-span continuity enough to justify its cost?
 - **Hypothesis:** context 512 gives each prediction access to more verse and dialogue history, reducing entity drift and repetition, but quadratic attention lowers throughput.
 - **Forecast:** validation loss improves modestly, while tokens/s decreases and MPS memory remains safely below the machine limit.
 - **Falsifier:** no repeatable validation improvement, worse raw continuity, unstable MPS execution, or a cost increase disproportionate to quality.
 - **Main changed variable:** context length `256 → 512`.
 - **Controlled inputs:** model width and depth, tokenizer, data split, dropout, optimizer, seed, 4,096 target positions per update, 3,000-step hard limit, and checkpoint-selection rule.
+- **Accepted run:** `manas01-context512-20260831T154720Z`.
+- **Result:**
+  - the model contained 13,258,752 parameters; the extra 65,536 parameters came only from doubling learned positional embeddings;
+  - best scheduled validation loss was `4.6783` at step 2,900, versus `4.5378` for context 256;
+  - independent 100-batch validation measured loss `4.7268`, perplexity `112.94`, top-1 `25.67%`, top-5 `44.21%`, and `0.964` bits per UTF-8 byte; every metric was worse than the context-256 baseline;
+  - independent test loss was `5.1466`, perplexity `171.85`, top-1 `22.29%`, top-5 `39.55%`, and `1.074` bits per UTF-8 byte, also worse than the baseline;
+  - throughput fell from about `13,565` to `11,894` target positions/s, a `12.3%` reduction;
+  - peak PyTorch MPS allocation remained similar at about `470.9 MiB`, while the optimized SDPA path avoided materializing a prohibitive attention matrix;
+  - 20 generations reduced mean repeated-trigram ratio from `4.77%` to `3.82%`, but the longest exact training match increased from six to seven words and manual reading did not show better entity or event continuity;
+  - several samples still entered strong name and reporting-verb loops, so the lower aggregate trigram repetition did not amount to a qualitative win.
+- **Forecast versus result:** rejected. Context 512 cost more and predicted held-out text worse; the raw generations did not supply a compensating continuity improvement.
+- **Updated belief:** on this corpus and training budget, model capacity is a better next variable than longer context. More history is not useful if the network cannot model that history well.
+- **Next action:** restore context 256 and test one measured 26.9M-parameter model.
+
+## E5 — 26.9M model scale
+
+- **Date:** 2026-08-31
+- **Status:** planned
+- **Question:** does increasing depth and width improve held-out prediction and raw continuity enough to justify slower local training?
+- **Hypothesis:** an 8-layer, 384-wide model uses the same 256-token history more effectively than the 6-layer, 256-wide baseline.
+- **Forecast:** validation and test loss improve, names and local event sequences remain stable for longer spans, throughput falls substantially, and the run still fits comfortably on the M5 / 16 GB machine.
+- **Falsifier:** held-out metrics fail to improve, generation remains equally repetitive, MPS becomes unstable, or the quality gain is too small for the runtime cost.
+- **Main changed variable:** capacity `13.19M → 26.88M` parameters.
+- **Controlled inputs:** context 256, tokenizer, data split, dropout, optimizer, seed, batch 8, accumulation 2, 4,096 target positions per update, 3,000-step limit, and checkpoint-selection rule.
+- **Preflight evidence:** one real MPS forward/backward at batch 8 used about `700.7 MiB` of PyTorch allocation, `2.28 GiB` of driver allocation, and `0.422 s`; the candidate therefore fits without reducing the base micro-batch.
 - **Result:** pending.

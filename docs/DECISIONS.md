@@ -71,3 +71,19 @@
 - **Rejected alternative:** keep batch 8 and therefore change both context and training-token budget.
 - **Trade-off:** the number of independent windows per update falls from 16 to 8, and longer attention may reduce throughput.
 - **Reconsider when:** MPS memory or measured gradient behavior makes micro-batch 4 impractical.
+
+## D010 — Reject context 512 for the final candidate
+
+- **Decision:** retain context 256 after E4.
+- **Why:** context 512 worsened independent validation loss from `4.6384` to `4.7268`, worsened test loss from `5.0201` to `5.1466`, and reduced throughput by `12.3%` without a clear raw-continuity gain.
+- **Rejected alternative:** keep 512 because a longer context sounds categorically better.
+- **Trade-off:** the final model cannot condition on more than 256 tokens, but spends compute on capacity that the measured experiment suggests is more useful.
+- **Reconsider when:** more training data, a different positional scheme, or a larger model makes long-context evidence positive.
+
+## D011 — Scale to the measured 8-by-384 candidate
+
+- **Decision:** E5 uses eight layers, width 384, eight heads, and 26,877,696 parameters while restoring context 256.
+- **Why:** a real batch-8 MPS forward/backward used about 700.7 MiB of PyTorch allocation and completed in 0.422 seconds, so the candidate is inside the local hardware envelope without changing tokens per update.
+- **Rejected alternatives:** guess a larger model without measuring it, reduce the batch preemptively, or change context and capacity together.
+- **Trade-off:** training iteration becomes materially slower and the corpus may still be too small to exploit all parameters.
+- **Reconsider when:** validation stops improving early or the full optimizer state causes a new measured memory constraint.
