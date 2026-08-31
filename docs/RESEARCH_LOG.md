@@ -32,14 +32,26 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 ## E1 — One real batch overfit
 
 - **Date:** 2026-08-31
-- **Status:** planned
+- **Status:** completed
 - **Question:** is the complete embedding, causal attention, FFN, loss, backward, AdamW, checkpoint, and generation path correct?
 - **Hypothesis:** a two-block Transformer with dropout disabled can memorize one fixed batch from the real epic.
 - **Forecast:** batch cross-entropy falls below `0.05` within 1,200 updates and next-token accuracy approaches 100%.
 - **Falsifier:** a persistent loss floor, non-finite loss or gradients, incorrect target alignment, or generation inconsistent with the memorized prefix.
 - **Main changed variable:** repeated optimization of one fixed batch.
 - **Controlled inputs:** dataset, batch, seed, model config, dropout `0.0`, optimizer, and MPS device.
-- **Result:** pending.
+- **Accepted run:** `overfit-one-batch-20260831T152234Z` at commit `ec5b4a2`.
+- **Result:**
+  - actual fixed-batch loss fell from `10.4385` to `0.02673`;
+  - fixed-batch perplexity fell from about `34,150` to `1.027`;
+  - fixed-batch top-1 and top-5 accuracy both reached `100%`;
+  - the declared `0.05` loss gate passed at step 100, so training stopped after 25,600 sampled target positions rather than continuing to 1,200 steps;
+  - the run took `1.89 s` of measured training time at about `13,548` target positions/s;
+  - peak PyTorch MPS allocation was about `140.5 MiB`; peak MPS driver allocation was about `1.06 GiB`;
+  - the generation from the actual memorized prefix reproduced a coherent continuation from that batch before eventually entering repetition;
+  - validation loss worsened, as expected for intentional memorization of one batch, and is not treated as a quality result.
+- **Forecast versus result:** matched. The complete path can memorize real targets and the corrected stop condition works.
+- **Updated belief:** embeddings, causal attention, FFN, loss, backward, AdamW, checkpointing, and generation are connected correctly enough to begin random-window training.
+- **Next action:** E2, using the 10K dataset with dropout `0.2` and an untouched validation suffix.
 
 ### E1 attempt 1 — invalid summary, useful diagnostic
 
