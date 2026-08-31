@@ -84,6 +84,7 @@ The export command removes optimizer state and preserves tied weights without du
 - [docs/RESEARCH_LOG.md](docs/RESEARCH_LOG.md) records forecasts, failed assumptions, invalid attempts, and results in chronological order.
 - [docs/DECISIONS.md](docs/DECISIONS.md) records why each major choice was made.
 - [docs/SOURCES.md](docs/SOURCES.md) records data, tokenizer, implementation references, and licenses.
+- [docs/INFERENCE_SERVICE.md](docs/INFERENCE_SERVICE.md) describes the bounded model API used by the interactive article.
 - [reports/generation-audits](reports/generation-audits) contains all fixed raw generations rather than a hand-picked sample.
 
 ## Rights

@@ -13,6 +13,12 @@ dependencies = [
   "torch>=2.11,<3",
 ]
 
+[project.optional-dependencies]
+serving = [
+  "fastapi>=0.116,<1",
+  "uvicorn[standard]>=0.35,<1",
+]
+
 [project.scripts]
 manas-gpt = "manas_gpt.cli:main"
 

@@ -263,8 +263,8 @@ def load_split(name: str, split: str) -> torch.Tensor:
     return torch.tensor(_read_uint16(path), dtype=torch.long)
 
 
-def load_tokenizer() -> Tokenizer:
-    path = TOKENIZER_DIR / "kyrgyz-byte-bpe-v1.json"
+def load_tokenizer(path: str | Path | None = None) -> Tokenizer:
+    path = Path(path) if path is not None else TOKENIZER_DIR / "kyrgyz-byte-bpe-v1.json"
     if not path.exists():
         raise FileNotFoundError("Tokenizer is missing. Run `manas-gpt prepare` first.")
     actual = file_digest(path, "sha256")
