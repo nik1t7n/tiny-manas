@@ -59,3 +59,20 @@ uv run uvicorn manas_gpt.service:app --host 127.0.0.1 --port 8765
 ```
 
 The accepted local CPU smoke returned health 200, rejected an unauthenticated generation with 401, and generated 16 real tokens at about 228 tokens/s on the development Mac.
+
+## Production record
+
+The accepted service is deployed from commit
+`43ed402cf506f1e263b17ebe99d7761b92474bed` as image
+`manas-gpt:43ed402cf506f1e263b17ebe99d7761b92474bed`. Its local OVH image ID is
+`sha256:0e429e7c7cd193053effcfe37ae7ca2e6972b49fdbccb3bed3ac7a86b888d962`.
+
+The model runs as the private `manas` component inside the existing
+`nik1t7n.com` Coolify service. It has no public domain or host port. The website
+proxy is the only caller and authenticates with a deployment-scoped secret. The
+checkpoint and tokenizer are mounted read-only from `/opt/manas-gpt/models`.
+
+On `2026-08-31`, the production container became healthy with limits of 1 GiB
+RAM and 2 CPUs. A real request through `https://nik1t7n.com/api/manas/generate`
+returned 16 generated tokens at 32.51 tokens/s. The public article and reload
+returned HTTP 200, and bounded service logs contained no errors.
