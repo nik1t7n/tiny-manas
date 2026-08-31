@@ -70,9 +70,12 @@ uv run manas-gpt prepare --config configs/manas01-27m.toml
 uv run manas-gpt train --config configs/manas01-27m.toml
 uv run manas-gpt evaluate --checkpoint runs/<run>/best-model.pt --split test --batches 100
 uv run manas-gpt audit --checkpoint runs/<run>/best-model.pt --output runs/<run>/generation-audit.json
+uv run manas-gpt export --checkpoint runs/<run>/best-model.pt --output artifacts/tiny-manas-27m.pt
 ```
 
 The project fails if Apple MPS is unavailable. It does not silently move unsupported work to CPU.
+
+The export command removes optimizer state and preserves tied weights without duplication. The accepted inference artifact is 107,546,203 bytes with SHA-256 `cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1`.
 
 ## Read the evidence
 

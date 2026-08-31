@@ -7,7 +7,7 @@ from pathlib import Path
 from .audit import run_generation_audit
 from .config import load_config
 from .data import prepare_dataset
-from .experiment import evaluate_checkpoint, generate_from_checkpoint, train
+from .experiment import evaluate_checkpoint, export_inference_checkpoint, generate_from_checkpoint, train
 
 
 def _json(payload: object) -> None:
@@ -48,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
     audit_parser.add_argument("--max-new-tokens", type=int, default=256)
     audit_parser.add_argument("--temperature", type=float, default=0.8)
     audit_parser.add_argument("--top-k", type=int, default=40)
+
+    export_parser = subparsers.add_parser(
+        "export", help="strip optimizer state from an accepted inference checkpoint"
+    )
+    export_parser.add_argument("--checkpoint", type=Path, required=True)
+    export_parser.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -85,6 +91,8 @@ def main() -> None:
                 args.top_k,
             )
         )
+    elif args.command == "export":
+        _json(export_inference_checkpoint(args.checkpoint, args.output))
     else:
         raise AssertionError(f"Unhandled command: {args.command}")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 import platform
@@ -191,6 +192,38 @@ def load_checkpoint(path: str | Path, device: torch.device) -> tuple[ManasGPT, d
     model.load_state_dict(payload["model"])
     model.to(device)
     return model, payload
+
+
+def export_inference_checkpoint(checkpoint: str | Path, output: str | Path) -> dict[str, Any]:
+    checkpoint_path = Path(checkpoint).resolve()
+    output_path = Path(output).resolve()
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    model_config = ModelConfig(**payload["model_config"])
+    model_state = dict(payload["model"])
+    if model_config.tie_embeddings:
+        model_state["lm_head.weight"] = model_state["token_embedding.weight"]
+    exported = {
+        "schema_version": 1,
+        "model": model_state,
+        "model_config": payload["model_config"],
+        "experiment_config": payload["experiment_config"],
+        "dataset_metadata": payload["dataset_metadata"],
+        "step": payload["step"],
+        "best_validation_loss": payload["best_validation_loss"],
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(output_path.suffix + ".tmp")
+    torch.save(exported, temporary)
+    temporary.replace(output_path)
+    digest = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    return {
+        "source": str(checkpoint_path),
+        "output": str(output_path),
+        "bytes": output_path.stat().st_size,
+        "sha256": digest,
+        "step": exported["step"],
+        "parameters": ManasGPT(model_config).parameter_count(),
+    }
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:

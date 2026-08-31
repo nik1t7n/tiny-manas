@@ -34,7 +34,11 @@
       "test": {"loss": 4.757470703125, "perplexity": 116.4510139106509, "top1": 0.2773583984375, "top5": 0.4525341796875, "bits_per_utf8_byte": 0.9931222825343864},
       "training": {"seconds": 1466.72376045899, "target_positions": 12288000, "targets_per_second": 8377.855688486732, "peak_mps_allocated_bytes": 1005987584, "peak_mps_driver_bytes": 4654219264},
       "generation_audit": {"samples": 20, "maximum_exact_copied_words": 7, "mean_repeated_trigram_ratio": 0.04212940404842028},
-      "checkpoint": {"sha256": "ddeeb5572c5a7ccde653320bdbe799cca0a4c5a2c48e451962d0c8877e3f3f75"}
+      "checkpoint": {
+        "training_sha256": "ddeeb5572c5a7ccde653320bdbe799cca0a4c5a2c48e451962d0c8877e3f3f75",
+        "inference_sha256": "cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1",
+        "inference_bytes": 107546203
+      }
     }
   ]
 }
