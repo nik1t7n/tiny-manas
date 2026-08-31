@@ -6,15 +6,15 @@
 - Primary machine: Apple Silicon MacBook Pro, M5, 16 GB unified memory.
 - Training backend: PyTorch on `mps`; no silent CPU fallback.
 - Project scope: a small decoder-only language model trained only on *Manas*.
-- Main comparison: the existing neural bigram baseline versus a causal Transformer on the same text and tokenizer.
+- Main experiment: train and scale a causal Transformer on a pinned edition of *Manas*.
 
 ## 1. Desired outcome
 
-Build a small, real, reproducible Transformer that generates text in the style of *Manas* and clearly improves on the existing bigram model.
+Build a small, real, reproducible Transformer that generates increasingly coherent text in the style of *Manas* as the project moves from a correctness case to the full approved text and then to bounded local scaling experiments.
 
-The first model does not need to be a general Kyrgyz assistant. It should demonstrate one narrower result honestly: access to a longer context allows a Transformer to learn more coherent local grammar, phrases, names, and short narrative structure than a model that sees only the immediately previous token.
+The first model does not need to be a general Kyrgyz assistant. It should demonstrate one narrower result honestly: a compact decoder-only Transformer can learn local grammar, phrases, names, and some short narrative continuity from *Manas* on one consumer Mac.
 
-The project is inspired by the role of Tiny Shakespeare in educational language-model work, but it is not a translation or cosmetic copy. *Manas* gives the experiment a local corpus, a distinct linguistic structure, a real existing bigram baseline, and research questions that matter specifically for Kyrgyz text.
+The project is inspired by the role of Tiny Shakespeare in educational language-model work, but it is not a translation or cosmetic copy. *Manas* gives the experiment a local corpus, a distinct linguistic structure, and research questions that matter specifically for Kyrgyz text.
 
 The working public name is **Tiny Manas**. The repository and model family name is **Manas-GPT**.
 
@@ -24,7 +24,7 @@ The project succeeds only if all of the following are true:
 
 1. The complete training path runs on real *Manas* text through PyTorch `mps`.
 2. The model can intentionally overfit one real batch when regularization is disabled.
-3. On an untouched validation split, the Transformer beats the bigram baseline in cross-entropy and perplexity under the same tokenization and target vocabulary.
+3. On an untouched validation split, the model improves substantially over its random-initialization loss and does not merely memorize the training split.
 4. Raw generations show a visible improvement beyond one-token transitions.
 5. The result is reproducible from a pinned source, tokenizer, configuration, seed, and commit.
 6. Failures, memorization, unstable runs, and negative results are documented instead of hidden.
@@ -52,31 +52,17 @@ The website article and interactive public demo are later publication tasks. The
 
 ### 4.1 Corpus
 
-The initial controlled dataset will use the same pinned `Manas01` source used by the existing `manas-bigram` project: the version performed by Sayakbai Karalaev from Manas-UdS.
+The initial dataset will use the pinned `Manas01` source already verified locally: the version performed by Sayakbai Karalaev from Manas-UdS.
 
-The first comparison must preserve the existing text boundary and source provenance. The 10,000-token pilot remains useful as the smallest controlled bridge from the old model to the new model. Later runs may use the full cleaned `Manas01` text and then more of the pinned Manas-UdS collection.
+The project must preserve the verified epic boundary and source provenance. A 10,000-token pilot remains useful as the smallest real training run after one-batch overfitting. Later runs use the full cleaned `Manas01` epic text.
 
 No third-party corpus text will be committed. The source URL, revision, license, extraction boundary, and checksum will be recorded in `docs/SOURCES.md`.
 
 ### 4.2 Tokenizer
 
-The first controlled comparison will reuse the pinned Kyrgyz byte-level BPE tokenizer already used by `manas-bigram`.
+The first model will reuse the pinned Kyrgyz byte-level BPE tokenizer already verified on `Manas01`.
 
 The model will not retrain or silently change the tokenizer during an architecture experiment. A document-boundary token may be added at the model protocol level when multiple independent documents are packed. That decision, its ID, and its effect on the model vocabulary must be explicit.
-
-### 4.3 Bigram baseline
-
-The existing neural bigram result is the first baseline:
-
-- validation cross-entropy: `6.380`;
-- validation perplexity: `590`;
-- validation top-1 accuracy: `17.1%`;
-- validation top-5 accuracy: `32.5%`;
-- pilot data: first 10,000 real BPE tokens;
-- split: 9,000 train / 1,000 validation tokens;
-- active target vocabulary: 2,525 token IDs.
-
-The baseline must be rerun or loaded from its exact recorded artifact only when needed for the controlled comparison. Its data split and token mapping must not be reconstructed approximately.
 
 ## 5. Model architecture
 
@@ -115,7 +101,7 @@ The first full Manas candidate will start from this declared configuration:
 | Transformer blocks | 6 | Deep enough to test repeated contextual processing while remaining inspectable |
 | Embedding width | 256 | Keeps the model small enough for local iteration |
 | Attention heads | 8 | Gives 32 features per head and divides the embedding width exactly |
-| Context length | 256 tokens | Meaningfully exceeds a bigram while keeping attention cost bounded |
+| Context length | 256 tokens | Provides useful local context while keeping attention cost bounded |
 | FFN width | 1,024 | Standard four-times expansion, easy to reason about |
 | Activation | GELU | A simple established GPT-style baseline |
 | Normalization | pre-LayerNorm | Stable small-model training and matches the studied architecture |
@@ -126,7 +112,7 @@ The first full Manas candidate will start from this declared configuration:
 
 With the full 32K tokenizer vocabulary, this configuration is expected to be roughly 13 million parameters when embedding and output weights are tied. The exact parameter count will be produced by the implementation, not copied from this estimate.
 
-The 10,000-token bridge experiment may use the existing compact 2,525-ID target space to make the first architecture comparison cheap and exact. Full-corpus runs will define their vocabulary protocol separately and will not silently inherit the pilot compaction.
+The 10,000-token pilot may use a compact corpus-active target space to make the first real run cheap. Full-corpus runs will define their vocabulary protocol separately and will not silently inherit the pilot compaction.
 
 ### 5.2 Dropout interpretation
 
@@ -222,22 +208,21 @@ Each experiment changes one main variable. Its forecast must be written before t
 
 **What would change the belief:** a persistent loss floor, unstable gradients, or incorrect generation from the memorized prefix means the implementation is wrong or the optimization setup is unsuitable. Scaling is forbidden until this is understood.
 
-### E2 — Tiny bridge: Transformer versus bigram
+### E2 — 10,000-token pilot
 
-**Question:** Does contextual self-attention improve over one-token memory on the exact existing 10,000-token pilot?
+**Question:** Can the complete Transformer training and validation path learn a real but bounded slice of *Manas* without becoming unstable?
 
-**Controlled variables:**
+**Setup:**
 
-- same 9,000/1,000 split;
-- same tokenizer and active ID mapping;
-- same target positions;
-- same evaluation implementation where possible.
+- first 10,000 epic tokens;
+- chronological 9,000/1,000 train/validation split;
+- compact corpus-active target vocabulary;
+- fixed seed and hard training-step budget;
+- raw generations recorded before and after training.
 
-**Main changed variable:** bigram table versus causal Transformer.
+**Forecast:** training and validation loss should both improve from random initialization, while the small validation split will remain noisy and generations will still have severe continuity limits.
 
-**Forecast:** the Transformer should beat bigram validation cross-entropy `6.380` and produce fewer purely local name/punctuation fragments.
-
-**What would weaken the hypothesis:** lower training loss without lower validation loss, or generations that remain indistinguishable from the bigram failure pattern.
+**What would weaken the hypothesis:** falling training loss with flat or worsening validation loss from the beginning, non-finite gradients, or generation that does not reflect the training distribution at all.
 
 ### E3 — Full `Manas01` base run
 
@@ -255,15 +240,7 @@ Each experiment changes one main variable. Its forecast must be written before t
 
 **Forecast:** validation loss and raw continuity should improve over the 10K pilot, while exact memorization of long training passages should become less dominant.
 
-### E4 — Full Manas-UdS data scale
-
-**Question:** Does adding more pinned *Manas* material improve generalization without changing the model?
-
-**Main changed variable:** `Manas01` versus the approved wider Manas-UdS subset.
-
-Before this run, duplicated editions, scholarly metadata, tables of contents, parallel versions, and source boundaries must be audited. More bytes are not automatically better data.
-
-### E5 — Context scale
+### E4 — Context scale
 
 **Question:** Does increasing usable context improve continuity enough to justify its quadratic attention cost?
 
@@ -271,7 +248,7 @@ Before this run, duplicated editions, scholarly metadata, tables of contents, pa
 
 **Evidence sought:** validation loss, memory use, training speed, repetition, and continuity across longer spans.
 
-### E6 — Model scale within the Mac limit
+### E5 — Model scale within the Mac limit
 
 Only after the data and context experiments are stable, compare the 13M candidate with one larger configuration that still fits comfortably on the M5 / 16 GB machine.
 
@@ -422,17 +399,17 @@ This is a target structure, not permission to scaffold files before implementati
 
 ## 12. Writing and article plan
 
-After the final accepted experiment, a long English article will be written for `nik1t7n.com` in the same visual and semi-academic style as the tokenizer and bigram articles, but with simple explanations for a general reader.
+After the final accepted experiment, a long English article will be written for `nik1t7n.com` in the same visual and semi-academic style as the existing tokenizer article, but with simple explanations for a general reader.
 
 The article will cover:
 
 1. why Tiny Shakespeare inspired Tiny Manas;
-2. what the bigram model could and could not learn;
+2. why a decoder-only Transformer was chosen;
 3. the decoder-only Transformer in plain language;
 4. the one-batch overfit correctness proof;
 5. the first failed and successful runs;
 6. training curves and parameter/memory accounting;
-7. bigram versus Transformer generations shown side by side;
+7. generations before training, after the pilot, and after the full run shown side by side;
 8. what more text, context, and model size changed;
 9. memorization and failure analysis;
 10. what the model actually demonstrates and what it does not.
