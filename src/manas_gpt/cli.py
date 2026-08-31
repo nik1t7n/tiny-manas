@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .audit import run_generation_audit
 from .config import load_config
 from .data import prepare_dataset
 from .experiment import evaluate_checkpoint, generate_from_checkpoint, train
@@ -38,6 +39,15 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser.add_argument("--temperature", type=float)
     generate_parser.add_argument("--top-k", type=int)
     generate_parser.add_argument("--seed", type=int)
+
+    audit_parser = subparsers.add_parser(
+        "audit", help="write the fixed 20-sample generation and memorization audit"
+    )
+    audit_parser.add_argument("--checkpoint", type=Path, required=True)
+    audit_parser.add_argument("--output", type=Path, required=True)
+    audit_parser.add_argument("--max-new-tokens", type=int, default=256)
+    audit_parser.add_argument("--temperature", type=float, default=0.8)
+    audit_parser.add_argument("--top-k", type=int, default=40)
     return parser
 
 
@@ -63,6 +73,16 @@ def main() -> None:
                 args.temperature,
                 args.top_k,
                 args.seed,
+            )
+        )
+    elif args.command == "audit":
+        _json(
+            run_generation_audit(
+                args.checkpoint,
+                args.output,
+                args.max_new_tokens,
+                args.temperature,
+                args.top_k,
             )
         )
     else:

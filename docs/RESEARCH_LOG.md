@@ -91,11 +91,36 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 ## E3 — Full Manas01 base model
 
 - **Date:** 2026-08-31
-- **Status:** planned
+- **Status:** completed
 - **Question:** does the full cleaned epic support a more coherent Tiny Manas generator on the 13M-parameter candidate?
 - **Hypothesis:** the wider data distribution and 256-token context improve validation loss and reduce immediate loops compared with the pilot's own before/after behavior.
 - **Forecast:** the model remains far from a general assistant but produces recognizable Manas-like paragraphs with better local continuity than the pilot.
 - **Falsifier:** immediate severe overfitting, long exact copying as the dominant behavior, no validation improvement, or impractical MPS runtime/memory.
 - **Main changed variable:** full data and the preregistered base configuration.
 - **Controlled inputs:** source edition, tokenizer, split policy, device, and evaluation protocol.
+- **Accepted run:** `manas01-base-20260831T152803Z`.
+- **Result:**
+  - the model contained 13,193,216 trainable parameters and used context 256;
+  - initial validation loss was `10.4775`, close to the random-vocabulary baseline;
+  - the best scheduled validation loss was `4.5378` at step 2,800; the final step was slightly worse at `4.6071`, so `best-model.pt` is the accepted checkpoint;
+  - an independent 100-batch validation check measured loss `4.6384`, perplexity `103.38`, top-1 `26.64%`, top-5 `45.24%`, and `0.946` bits per UTF-8 byte;
+  - the untouched chronological test suffix measured loss `5.0201`, perplexity `151.42`, top-1 `23.81%`, top-5 `41.09%`, and `1.048` bits per UTF-8 byte;
+  - training sampled 12,288,000 target positions in `905.8 s` at about `13,565` positions/s;
+  - peak PyTorch MPS allocation was about `468.5 MiB`; peak MPS driver allocation was about `3.36 GiB`;
+  - across 20 fixed generations, the longest exact corpus match was six words and the mean repeated-trigram ratio was `4.77%`;
+  - outputs consistently adopted epic names, combat actions, dialogue punctuation, and verse-like rhythm; their main defects were entity drift, malformed word endings, repeated names, repeated reporting verbs, and loss of event continuity over longer spans.
+- **Forecast versus result:** matched. Full data produced a real Manas-like generator without dominant long-copy behavior, but it did not produce globally coherent narrative.
+- **Updated belief:** the 13M base model is a valid working baseline. Its remaining failures plausibly involve both limited context and limited capacity, so those variables must be tested separately.
+- **Next action:** E4 changes only context from 256 to 512 while preserving model width, depth, data, tokenizer, optimizer, and the 12.3M-target budget.
+
+## E4 — Context 512
+
+- **Date:** 2026-08-31
+- **Status:** planned
+- **Question:** does doubling usable context improve held-out prediction and longer-span continuity enough to justify its cost?
+- **Hypothesis:** context 512 gives each prediction access to more verse and dialogue history, reducing entity drift and repetition, but quadratic attention lowers throughput.
+- **Forecast:** validation loss improves modestly, while tokens/s decreases and MPS memory remains safely below the machine limit.
+- **Falsifier:** no repeatable validation improvement, worse raw continuity, unstable MPS execution, or a cost increase disproportionate to quality.
+- **Main changed variable:** context length `256 → 512`.
+- **Controlled inputs:** model width and depth, tokenizer, data split, dropout, optimizer, seed, 4,096 target positions per update, 3,000-step hard limit, and checkpoint-selection rule.
 - **Result:** pending.

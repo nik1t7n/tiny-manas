@@ -55,3 +55,19 @@
 - **Rejected alternative:** keep the original 12,000-step placeholder because it appeared in the planning config.
 - **Trade-off:** random windows repeat, so sampled positions are not distinct corpus tokens and “epochs” are only an intuition.
 - **Reconsider when:** the validation curve is still improving at the hard limit or measured MPS throughput/memory requires a different micro-batch.
+
+## D008 — Accept the best base checkpoint, not the final step
+
+- **Decision:** `manas01-base-20260831T152803Z/best-model.pt` at step 2,800 is the 256-context baseline.
+- **Why:** its scheduled validation loss was `4.5378`, while the final step regressed to `4.6071`; independent validation and test evaluation confirmed useful held-out prediction.
+- **Rejected alternative:** use the final checkpoint because it completed the maximum step count.
+- **Trade-off:** the accepted state is selected on the validation suffix and must be reported with the untouched test suffix separately.
+- **Reconsider when:** only if a deterministic full-split evaluator changes checkpoint ordering.
+
+## D009 — Compare context at equal target budget
+
+- **Decision:** E4 uses context 512, micro-batch 4, accumulation 2, and 3,000 steps, preserving 4,096 target positions per optimizer update and the base model's total sampled-target budget.
+- **Why:** changing batch size prevents the longer context from quietly doubling the amount of training signal per step.
+- **Rejected alternative:** keep batch 8 and therefore change both context and training-token budget.
+- **Trade-off:** the number of independent windows per update falls from 16 to 8, and longer attention may reduce throughput.
+- **Reconsider when:** MPS memory or measured gradient behavior makes micro-batch 4 impractical.

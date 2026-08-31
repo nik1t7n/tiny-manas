@@ -146,6 +146,7 @@ def generate_text(
         "new_tokens": len(result_ids) - len(prompt_ids),
         "temperature": temperature,
         "top_k": top_k,
+        "seed": seed,
         "elapsed_seconds": elapsed,
         "tokens_per_second": max_new_tokens / elapsed,
         "text": tokenizer.decode(result_ids),
@@ -463,6 +464,10 @@ def evaluate_checkpoint(checkpoint: str | Path, split: str, batches: int) -> dic
         seed=experiment["run"]["seed"] + 500,
     )
     metrics = evaluate_random_batches(model, sampler, device, batches)
+    metadata = load_metadata(dataset_name)
+    split_metadata = metadata["splits"][split]
+    tokens_per_byte = split_metadata["tokens"] / split_metadata["decoded_utf8_bytes"]
+    metrics["bits_per_utf8_byte"] = metrics["loss"] * tokens_per_byte / math.log(2.0)
     return {"checkpoint": str(checkpoint), "split": split, "batches": batches, **metrics}
 
 
