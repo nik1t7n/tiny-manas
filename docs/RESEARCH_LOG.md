@@ -65,14 +65,28 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 ## E2 — 10,000-token pilot
 
 - **Date:** 2026-08-31
-- **Status:** planned
+- **Status:** completed
 - **Question:** can the standalone Transformer learn a bounded real slice of *Manas* without unstable optimization?
 - **Hypothesis:** both training and validation cross-entropy improve from the random baseline, but the small validation split produces noisy metrics and limited continuity.
 - **Forecast:** generated text reflects names, endings, punctuation, and some multi-token phrases but still repeats and loses narrative state quickly.
 - **Falsifier:** training improves while validation is flat from the beginning, gradients become non-finite, or output never reflects the Manas distribution.
 - **Main changed variable:** move from a repeated batch to random training windows over 9,000 tokens.
 - **Controlled inputs:** source, tokenizer, architecture family, seed, and device.
-- **Result:** pending.
+- **Accepted run:** `pilot-10k-20260831T152349Z` at commit `a0007e3`.
+- **Result:**
+  - model size: 8,095,872 parameters;
+  - initial validation loss/perplexity: `10.4294` / about `33,840`;
+  - best validation loss: `7.3231` at step 200;
+  - independent 50-batch check of `best-model.pt`: loss `7.3369`, perplexity `1,535.96`, top-1 `13.17%`, top-5 `21.13%` over 102,400 sampled target positions;
+  - training continued to step 1,000, where final train loss was `0.1235` but validation loss had degraded to `10.4687`;
+  - early stopping ended the run after eight evaluations without a new validation best;
+  - 2,048,000 target positions were sampled in `105.1 s`, about `19,484` positions/s;
+  - peak PyTorch MPS allocation was about `387.4 MiB`; peak driver allocation was about `2.31 GiB`;
+  - five inspected best-checkpoint generations contained Manas names, epic syntax, line-like rhythm, and multi-token phrases, but frequently fused endings, reused the same learned passage across unrelated prompts, and lost subject continuity;
+  - the final checkpoint produced a more fluent-looking passage than the best validation checkpoint, but its severe train/validation gap makes it an overfit artifact rather than the accepted model.
+- **Forecast versus result:** matched. The model learned the slice and the validation set exposed rapid overfitting.
+- **Updated belief:** the architecture works, but 9,000 training tokens are far below what an 8.1M-parameter full-vocabulary model needs. Dropout `0.2` delays neither memorization nor validation degradation enough to make the pilot useful as a final model.
+- **Next action:** keep the architecture family and tokenizer, move to the full 465K-token epic, and select only by validation loss.
 
 ## E3 — Full Manas01 base model
 

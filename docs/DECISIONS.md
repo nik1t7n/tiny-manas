@@ -47,3 +47,11 @@
 - **Rejected alternative:** compact the vocabulary to IDs observed in a particular training slice.
 - **Trade-off:** many vocabulary rows receive little or no positive training evidence and the embedding matrix dominates the smallest model's parameter count.
 - **Reconsider when:** a later controlled experiment explicitly studies vocabulary size or a Manas-specific tokenizer.
+
+## D007 — Bound the full run by tokens, not an inherited step count
+
+- **Decision:** the base run uses micro-batch 8, two accumulated batches, context 256, and at most 3,000 optimizer steps: 4,096 target positions per update and about 12.3M sampled positions at the hard limit.
+- **Why:** the cleaned train split is about 418K tokens. The earlier draft of 12,000 steps would expose the model to roughly 196M sampled positions, far beyond what the tiny corpus justifies and likely to waste time after overfitting.
+- **Rejected alternative:** keep the original 12,000-step placeholder because it appeared in the planning config.
+- **Trade-off:** random windows repeat, so sampled positions are not distinct corpus tokens and “epochs” are only an intuition.
+- **Reconsider when:** the validation curve is still improving at the hard limit or measured MPS throughput/memory requires a different micro-batch.

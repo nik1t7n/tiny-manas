@@ -20,21 +20,21 @@ bias = true
 tie_embeddings = true
 
 [training]
-batch_size = 16
-gradient_accumulation_steps = 4
-max_steps = 12000
-eval_interval = 250
-eval_batches = 50
-log_interval = 25
+batch_size = 8
+gradient_accumulation_steps = 2
+max_steps = 3000
+eval_interval = 100
+eval_batches = 30
+log_interval = 20
 learning_rate = 0.0003
 min_learning_rate = 0.00003
-warmup_steps = 500
+warmup_steps = 100
 weight_decay = 0.1
 beta1 = 0.9
 beta2 = 0.95
 gradient_clip = 1.0
 fixed_batch = false
-early_stop_patience = 10
+early_stop_patience = 6
 target_train_loss = 0.0
 
 [generation]
