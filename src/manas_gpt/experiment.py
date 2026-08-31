@@ -221,12 +221,16 @@ def train(config_path: str | Path) -> dict[str, Any]:
         seed=config.run.seed + 1,
         fixed=config.training.fixed_batch,
     )
-    train_eval_sampler = RandomWindowSampler(
-        train_tokens,
-        config.training.batch_size,
-        model_config.block_size,
-        seed=config.run.seed + 2,
-        fixed=config.training.fixed_batch,
+    train_eval_sampler = (
+        train_sampler
+        if config.training.fixed_batch
+        else RandomWindowSampler(
+            train_tokens,
+            config.training.batch_size,
+            model_config.block_size,
+            seed=config.run.seed + 2,
+            fixed=False,
+        )
     )
     validation_sampler = RandomWindowSampler(
         validation_tokens,
@@ -249,6 +253,11 @@ def train(config_path: str | Path) -> dict[str, Any]:
         encoding="utf-8",
     )
 
+    generation_prompt = config.generation.prompt
+    if config.training.fixed_batch:
+        fixed_x, _ = train_sampler.next(device)
+        generation_prompt = load_tokenizer().decode(fixed_x[0, :8].cpu().tolist())
+
     initial_train = evaluate_random_batches(
         model, train_eval_sampler, device, config.training.eval_batches
     )
@@ -257,7 +266,7 @@ def train(config_path: str | Path) -> dict[str, Any]:
     )
     initial_generation = generate_text(
         model,
-        config.generation.prompt,
+        generation_prompt,
         min(config.generation.max_new_tokens, 80),
         config.generation.temperature,
         config.generation.top_k,
@@ -397,7 +406,7 @@ def train(config_path: str | Path) -> dict[str, Any]:
     )
     final_generation = generate_text(
         model,
-        config.generation.prompt,
+        generation_prompt,
         config.generation.max_new_tokens,
         config.generation.temperature,
         config.generation.top_k,
@@ -433,6 +442,7 @@ def train(config_path: str | Path) -> dict[str, Any]:
         "peak_mps_driver_bytes": peak_driver,
         "initial_generation": initial_generation["text"],
         "final_generation": final_generation["text"],
+        "generation_prompt": generation_prompt,
     }
     (run_dir / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

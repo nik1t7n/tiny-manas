@@ -41,6 +41,15 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 - **Controlled inputs:** dataset, batch, seed, model config, dropout `0.0`, optimizer, and MPS device.
 - **Result:** pending.
 
+### E1 attempt 1 — invalid summary, useful diagnostic
+
+- **Run:** `overfit-one-batch-20260831T152055Z`
+- **Status:** invalid as an acceptance artifact.
+- **Observed training path:** logged optimization loss fell from `10.4385` at step 1 to `0.0280` at step 100, `0.0017` at step 200, and numerically zero by step 400. The model therefore did memorize its actual fixed training batch.
+- **Instrumentation defect:** the periodic `train` evaluator created a second fixed sampler with a different seed, so it evaluated another batch. The summary incorrectly reported final train loss `17.7646` and failed to trigger the `0.05` stop condition.
+- **Secondary observation:** continuing 1,100 unnecessary steps after the real gate had passed pushed validation loss upward and produced a repetitive generation ending in `Т Т Т...`.
+- **Decision:** make fixed-batch evaluation reuse the exact sampler used by optimization, derive the diagnostic generation prompt from that batch, and rerun E1 unchanged. Do not count attempt 1 as accepted evidence.
+
 ## E2 — 10,000-token pilot
 
 - **Date:** 2026-08-31
