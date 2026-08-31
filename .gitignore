@@ -1,0 +1,12 @@
+.DS_Store
+.python-version
+.venv/
+__pycache__/
+*.py[cod]
+
+# Licensed source data, token arrays, checkpoints, and raw run outputs stay local.
+data/raw/
+data/tokenizer/
+data/processed/
+artifacts/
+runs/

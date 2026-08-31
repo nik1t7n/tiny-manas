@@ -112,7 +112,7 @@ The first full Manas candidate will start from this declared configuration:
 
 With the full 32K tokenizer vocabulary, this configuration is expected to be roughly 13 million parameters when embedding and output weights are tied. The exact parameter count will be produced by the implementation, not copied from this estimate.
 
-The 10,000-token pilot may use a compact corpus-active target space to make the first real run cheap. Full-corpus runs will define their vocabulary protocol separately and will not silently inherit the pilot compaction.
+All runs use the frozen tokenizer's complete 32,768-ID vocabulary. This costs more parameters than corpus-active compaction, but it keeps the token protocol identical across pilot, full training, prompts, checkpoints, and later inference. The embedding and LM-head weights are tied so the vocabulary matrix is stored once.
 
 ### 5.2 Dropout interpretation
 
@@ -216,7 +216,7 @@ Each experiment changes one main variable. Its forecast must be written before t
 
 - first 10,000 epic tokens;
 - chronological 9,000/1,000 train/validation split;
-- compact corpus-active target vocabulary;
+- complete frozen 32,768-ID tokenizer vocabulary;
 - fixed seed and hard training-step budget;
 - raw generations recorded before and after training.
 

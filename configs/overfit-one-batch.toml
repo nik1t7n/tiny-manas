@@ -1,0 +1,44 @@
+[run]
+name = "overfit-one-batch"
+seed = 1337
+device = "mps"
+
+[data]
+dataset = "manas01-pilot-10k"
+max_tokens = 10000
+train_fraction = 0.90
+validation_fraction = 0.10
+
+[model]
+block_size = 64
+n_layer = 2
+n_head = 4
+n_embd = 128
+ffn_multiplier = 4
+dropout = 0.0
+bias = true
+tie_embeddings = true
+
+[training]
+batch_size = 4
+gradient_accumulation_steps = 1
+max_steps = 1200
+eval_interval = 100
+eval_batches = 8
+log_interval = 20
+learning_rate = 0.001
+min_learning_rate = 0.001
+warmup_steps = 0
+weight_decay = 0.0
+beta1 = 0.9
+beta2 = 0.95
+gradient_clip = 1.0
+fixed_batch = true
+early_stop_patience = 0
+target_train_loss = 0.05
+
+[generation]
+prompt = "Манас"
+max_new_tokens = 80
+temperature = 0.8
+top_k = 40
