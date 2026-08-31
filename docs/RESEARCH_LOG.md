@@ -140,7 +140,7 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 ## E5 — 26.9M model scale
 
 - **Date:** 2026-08-31
-- **Status:** planned
+- **Status:** completed
 - **Question:** does increasing depth and width improve held-out prediction and raw continuity enough to justify slower local training?
 - **Hypothesis:** an 8-layer, 384-wide model uses the same 256-token history more effectively than the 6-layer, 256-wide baseline.
 - **Forecast:** validation and test loss improve, names and local event sequences remain stable for longer spans, throughput falls substantially, and the run still fits comfortably on the M5 / 16 GB machine.
@@ -148,4 +148,18 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 - **Main changed variable:** capacity `13.19M → 26.88M` parameters.
 - **Controlled inputs:** context 256, tokenizer, data split, dropout, optimizer, seed, batch 8, accumulation 2, 4,096 target positions per update, 3,000-step limit, and checkpoint-selection rule.
 - **Preflight evidence:** one real MPS forward/backward at batch 8 used about `700.7 MiB` of PyTorch allocation, `2.28 GiB` of driver allocation, and `0.422 s`; the candidate therefore fits without reducing the base micro-batch.
-- **Result:** pending.
+- **Accepted run:** `manas01-27m-20260831T160739Z`.
+- **Result:**
+  - the model contained 26,877,696 trainable parameters with eight layers, width 384, eight heads, and context 256;
+  - best scheduled validation loss was `4.2462` at step 2,900;
+  - independent 100-batch validation measured loss `4.3457`, perplexity `77.15`, top-1 `31.55%`, top-5 `49.83%`, and `0.886` bits per UTF-8 byte;
+  - independent test loss was `4.7575`, perplexity `116.45`, top-1 `27.74%`, top-5 `45.25%`, and `0.993` bits per UTF-8 byte;
+  - relative to the accepted 13M baseline, validation perplexity fell `25.4%` and test perplexity fell `23.1%`;
+  - the 3,000-step run sampled 12,288,000 target positions in `1,466.7 s` at about `8,378` positions/s;
+  - peak PyTorch MPS allocation was about `959.4 MiB`; peak MPS driver allocation was about `4.33 GiB`;
+  - 20 fixed generations had a mean repeated-trigram ratio of `4.21%` and a maximum exact training match of seven words;
+  - manual reading showed stronger local action chains, more stable verse-like phrasing, and better dialogue continuations than the 13M baseline, but some samples still looped on names, repeated formulas, malformed words, and lost global event state.
+- **Forecast versus result:** matched. Capacity improved every held-out metric and raw local continuity while remaining practical on the target Mac.
+- **Updated belief:** 26.9M is the best tested Tiny Manas configuration. The remaining bottleneck is not local hardware memory; it is the quantity and diversity of Manas-only training text and the model's tendency to overfit formulaic passages.
+- **Decision:** accept `best-model.pt` from step 2,900 as the final research checkpoint. Do not claim general Kyrgyz ability or long-form narrative coherence.
+- **Next action:** package the evidence, write the public article, and expose only this accepted checkpoint through a bounded inference service.

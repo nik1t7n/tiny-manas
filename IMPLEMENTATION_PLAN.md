@@ -2,11 +2,12 @@
 
 ## Status
 
-- Planning only. No model or training code has been implemented.
+- Implemented and completed through E5 on 2026-08-31.
 - Primary machine: Apple Silicon MacBook Pro, M5, 16 GB unified memory.
 - Training backend: PyTorch on `mps`; no silent CPU fallback.
 - Project scope: a small decoder-only language model trained only on *Manas*.
-- Main experiment: train and scale a causal Transformer on a pinned edition of *Manas*.
+- Accepted model: 26,877,696 parameters, context 256, selected at step 2,900.
+- Detailed outcomes: [RESULTS.md](RESULTS.md) and [docs/RESEARCH_LOG.md](docs/RESEARCH_LOG.md).
 
 ## 1. Desired outcome
 
@@ -469,9 +470,9 @@ The implementation may study these sources, with attribution and a clear separat
 
 Primary papers, current source code, appendices, licenses, and negative results will be read before adopting a choice. Tutorials and summaries are navigation, not evidence.
 
-## 15. First action after approval
+## 15. Completed implementation sequence
 
-Implementation starts with **E0 and E1 only**:
+Implementation proceeded through these gates:
 
 1. create the minimal repository contract and dependency file;
 2. reproduce the pinned Manas/tokenizer inputs;
@@ -480,4 +481,4 @@ Implementation starts with **E0 and E1 only**:
 5. train repeatedly on that same batch with dropout `0.0`;
 6. stop and inspect the result before any larger training run.
 
-No article, public API, deployment, broad corpus, or scale experiment starts before this gate is closed.
+Each gate was closed before the next scale decision. The website article and bounded public inference path begin only after the accepted E5 checkpoint.

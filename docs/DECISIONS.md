@@ -87,3 +87,11 @@
 - **Rejected alternatives:** guess a larger model without measuring it, reduce the batch preemptively, or change context and capacity together.
 - **Trade-off:** training iteration becomes materially slower and the corpus may still be too small to exploit all parameters.
 - **Reconsider when:** validation stops improving early or the full optimizer state causes a new measured memory constraint.
+
+## D012 — Accept the 26.9M checkpoint as Tiny Manas
+
+- **Decision:** the step-2,900 checkpoint from `manas01-27m-20260831T160739Z` is the final research model.
+- **Why:** it reduced independent validation perplexity by `25.4%` and test perplexity by `23.1%` relative to the accepted 13M baseline, improved next-token accuracy, remained under 1 GiB of PyTorch MPS allocation, and did not produce dominant long-copy behavior.
+- **Rejected alternative:** prefer the cheaper 13M model despite the measured quality gap, or continue unbounded tuning on the same test suffix.
+- **Trade-off:** generation is slower and the checkpoint is larger, while global narrative coherence remains limited by one source edition.
+- **Reconsider when:** new Manas-only data is legally and technically audited, or an architecture change is preregistered against a fresh held-out set.

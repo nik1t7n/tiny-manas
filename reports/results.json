@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "accepted_model": "context256-27m",
+  "experiments": [
+    {
+      "id": "context256-13m",
+      "run": "manas01-base-20260831T152803Z",
+      "best_step": 2800,
+      "parameters": 13193216,
+      "context": 256,
+      "validation": {"loss": 4.638423137664795, "perplexity": 103.38120106515858, "top1": 0.266396484375, "top5": 0.452412109375, "bits_per_utf8_byte": 0.9459910653269918},
+      "test": {"loss": 5.0200884771347045, "perplexity": 151.42470082503107, "top1": 0.2380517578125, "top5": 0.410869140625, "bits_per_utf8_byte": 1.0479437579430106},
+      "training": {"seconds": 905.8347972920164, "target_positions": 12288000, "targets_per_second": 13565.387459981495, "peak_mps_allocated_bytes": 491283968, "peak_mps_driver_bytes": 3604119552},
+      "generation_audit": {"samples": 20, "maximum_exact_copied_words": 6, "mean_repeated_trigram_ratio": 0.04769695372263366}
+    },
+    {
+      "id": "context512-13m",
+      "run": "manas01-context512-20260831T154720Z",
+      "best_step": 2900,
+      "parameters": 13258752,
+      "context": 512,
+      "validation": {"loss": 4.726826615333557, "perplexity": 112.9366018095008, "top1": 0.25673828125, "top5": 0.4420849609375, "bits_per_utf8_byte": 0.9640206623552152},
+      "test": {"loss": 5.146597962379456, "perplexity": 171.84586861818022, "top1": 0.22291015625, "top5": 0.3954833984375, "bits_per_utf8_byte": 1.0743526202542364},
+      "training": {"seconds": 1033.1630607920233, "target_positions": 12288000, "targets_per_second": 11893.572724696538, "peak_mps_allocated_bytes": 493739776, "peak_mps_driver_bytes": 3604119552},
+      "generation_audit": {"samples": 20, "maximum_exact_copied_words": 7, "mean_repeated_trigram_ratio": 0.03821962622663902}
+    },
+    {
+      "id": "context256-27m",
+      "run": "manas01-27m-20260831T160739Z",
+      "best_step": 2900,
+      "parameters": 26877696,
+      "context": 256,
+      "validation": {"loss": 4.345732674598694, "perplexity": 77.14854155394723, "top1": 0.3154833984375, "top5": 0.4983056640625, "bits_per_utf8_byte": 0.886297812954517},
+      "test": {"loss": 4.757470703125, "perplexity": 116.4510139106509, "top1": 0.2773583984375, "top5": 0.4525341796875, "bits_per_utf8_byte": 0.9931222825343864},
+      "training": {"seconds": 1466.72376045899, "target_positions": 12288000, "targets_per_second": 8377.855688486732, "peak_mps_allocated_bytes": 1005987584, "peak_mps_driver_bytes": 4654219264},
+      "generation_audit": {"samples": 20, "maximum_exact_copied_words": 7, "mean_repeated_trigram_ratio": 0.04212940404842028},
+      "checkpoint": {"sha256": "ddeeb5572c5a7ccde653320bdbe799cca0a4c5a2c48e451962d0c8877e3f3f75"}
+    }
+  ]
+}
