@@ -1,7 +1,7 @@
 [project]
 name = "manas-gpt"
 version = "0.1.0"
-description = "Tiny Manas: a small decoder-only Transformer trained on the Kyrgyz epic Manas"
+description = "A 26.9M-parameter decoder-only Transformer trained from scratch on the Kyrgyz epic Manas"
 readme = "README.md"
 authors = [
   { name = "Nikita Nosov" },

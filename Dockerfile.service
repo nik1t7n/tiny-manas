@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir \
     && useradd --create-home --uid 10001 manas
 
 LABEL org.opencontainers.image.title="Tiny Manas inference" \
-  org.opencontainers.image.source="https://github.com/nik1t7n/manas-gpt" \
+  org.opencontainers.image.source="https://github.com/nik1t7n/tiny-manas" \
   org.opencontainers.image.revision="$VCS_REF"
 
 USER manas
