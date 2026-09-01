@@ -537,7 +537,7 @@ uv sync
 Prepare the pinned corpus and tokenizer:
 
 ```bash
-uv run manas-gpt prepare --config configs/manas01-27m.toml
+uv run tiny-manas prepare --config configs/manas01-27m.toml
 ```
 
 This command downloads the real artifacts, verifies their checksums, extracts the selected epic text, checks the tokenizer round trip, and writes chronological split files under `data/processed/`. Corpus text and token arrays remain untracked.
@@ -545,7 +545,7 @@ This command downloads the real artifacts, verifies their checksums, extracts th
 Run the final training configuration:
 
 ```bash
-uv run manas-gpt train --config configs/manas01-27m.toml
+uv run tiny-manas train --config configs/manas01-27m.toml
 ```
 
 Each run creates an immutable timestamped directory under `runs/` with:
@@ -565,7 +565,7 @@ summary.json
 Evaluate the best checkpoint on the untouched test suffix:
 
 ```bash
-uv run manas-gpt evaluate \
+uv run tiny-manas evaluate \
   --checkpoint runs/<run>/best-model.pt \
   --split test \
   --batches 100
@@ -574,7 +574,7 @@ uv run manas-gpt evaluate \
 Generate text:
 
 ```bash
-uv run manas-gpt generate \
+uv run tiny-manas generate \
   --checkpoint runs/<run>/best-model.pt \
   --prompt "Манас" \
   --max-new-tokens 256 \
@@ -586,7 +586,7 @@ uv run manas-gpt generate \
 Run the fixed 20-sample generation and memorization audit:
 
 ```bash
-uv run manas-gpt audit \
+uv run tiny-manas audit \
   --checkpoint runs/<run>/best-model.pt \
   --output runs/<run>/generation-audit.json
 ```
@@ -594,7 +594,7 @@ uv run manas-gpt audit \
 Export a checkpoint without optimizer state:
 
 ```bash
-uv run manas-gpt export \
+uv run tiny-manas export \
   --checkpoint runs/<run>/best-model.pt \
   --output artifacts/tiny-manas-27m.pt
 ```

@@ -15,7 +15,7 @@ def _json(payload: object) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="manas-gpt", description="Tiny Manas research CLI")
+    parser = argparse.ArgumentParser(prog="tiny-manas", description="Tiny Manas research CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     prepare_parser = subparsers.add_parser("prepare", help="download and prepare pinned Manas data")

@@ -1,5 +1,5 @@
 [project]
-name = "manas-gpt"
+name = "tiny-manas"
 version = "0.1.0"
 description = "A 26.9M-parameter decoder-only Transformer trained from scratch on the Kyrgyz epic Manas"
 readme = "README.md"
@@ -20,7 +20,7 @@ serving = [
 ]
 
 [project.scripts]
-manas-gpt = "manas_gpt.cli:main"
+tiny-manas = "manas_gpt.cli:main"
 
 [build-system]
 requires = ["hatchling"]

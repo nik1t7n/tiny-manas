@@ -55,7 +55,7 @@ def download_verified(url: str, destination: Path, algorithm: str, expected: str
         return destination
 
     partial = destination.with_suffix(destination.suffix + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "manas-gpt/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "tiny-manas/0.1"})
     with urllib.request.urlopen(request, timeout=120) as response, partial.open("wb") as output:
         while chunk := response.read(1024 * 1024):
             output.write(chunk)
@@ -266,7 +266,7 @@ def load_split(name: str, split: str) -> torch.Tensor:
 def load_tokenizer(path: str | Path | None = None) -> Tokenizer:
     path = Path(path) if path is not None else TOKENIZER_DIR / "kyrgyz-byte-bpe-v1.json"
     if not path.exists():
-        raise FileNotFoundError("Tokenizer is missing. Run `manas-gpt prepare` first.")
+        raise FileNotFoundError("Tokenizer is missing. Run `tiny-manas prepare` first.")
     actual = file_digest(path, "sha256")
     if actual != TOKENIZER_SHA256:
         raise RuntimeError(f"Tokenizer hash mismatch: expected {TOKENIZER_SHA256}, got {actual}")

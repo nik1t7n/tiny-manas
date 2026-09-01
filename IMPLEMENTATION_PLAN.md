@@ -370,7 +370,7 @@ Machine-readable run summaries will live under `reports/`. Large corpora, token 
 ## 11. Planned repository structure
 
 ```text
-manas-gpt/
+tiny-manas/
 ├── AGENTS.md
 ├── README.md
 ├── IMPLEMENTATION_PLAN.md
