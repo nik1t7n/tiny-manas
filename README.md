@@ -202,17 +202,17 @@ The implementation uses learned absolute positions because they are easy to insp
 Each Transformer block has two transformations: causal self-attention and a feed-forward network. Both receive normalized input and add their result back to the existing residual stream:
 
 ```math
-X' = X + \operatorname{Attention}(\operatorname{LayerNorm}(X))
+X' = X + \mathrm{Attention}(\mathrm{LayerNorm}(X))
 ```
 
 ```math
-X^{next} = X' + \operatorname{FFN}(\operatorname{LayerNorm}(X'))
+X^{next} = X' + \mathrm{FFN}(\mathrm{LayerNorm}(X'))
 ```
 
 LayerNorm normalizes the 384 features of each token independently. For a token vector `x`, it computes
 
 ```math
-\operatorname{LN}(x) = \gamma \odot \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta
+\mathrm{LN}(x) = \gamma \odot \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta
 ```
 
 The learned vectors `γ` and `β` let the model choose a useful scale and offset after normalization. Pre-LayerNorm places this operation before attention and the FFN. In a small implementation, that layout provides a clean residual path and stable optimization without extra machinery.
@@ -265,7 +265,7 @@ O = AV
 All eight heads process the same sequence through separate learned projections. Their 48-dimensional outputs are concatenated into 384 features and passed through an output projection:
 
 ```math
-\operatorname{MHA}(X) = \operatorname{Concat}(O_1, \ldots, O_8)W_o + b_o
+\mathrm{MHA}(X) = \mathrm{Concat}(O_1, \ldots, O_8)W_o + b_o
 ```
 
 The implementation calls PyTorch's `scaled_dot_product_attention` with `is_causal=True`. During training it passes dropout probability `0.2` to the attention weights. During evaluation it passes `0.0`, because this PyTorch operation applies dropout according to the supplied argument regardless of module mode.
@@ -275,7 +275,7 @@ The implementation calls PyTorch's `scaled_dot_product_attention` with `is_causa
 Attention moves information between token positions. The feed-forward network transforms the collected features of each token independently:
 
 ```math
-\operatorname{FFN}(x) = W_2\operatorname{GELU}(W_1x + b_1) + b_2
+\mathrm{FFN}(x) = W_2\mathrm{GELU}(W_1x + b_1) + b_2
 ```
 
 The first linear layer expands each token from 384 to 1,536 features. GELU introduces a non-linear gate, and the second linear layer returns the result to 384 features so it can rejoin the residual stream.
@@ -450,7 +450,7 @@ Loss is the mean negative log-probability of the correct next token. It is the t
 Perplexity is the exponential of mean cross-entropy:
 
 ```math
-\operatorname{PPL} = e^{\mathcal{L}}
+\mathrm{PPL} = e^{\mathcal{L}}
 ```
 
 It can be read as the effective number of equally plausible choices left to the model at each position. That intuition is approximate, but lower perplexity still means better next-token prediction under the same tokenizer and dataset.
@@ -466,7 +466,7 @@ Top-1 accuracy measures how often the most highly scored token equals the target
 The tokenizer compresses text into variable-length token sequences. Bits per UTF-8 byte connects token loss back to the original text size:
 
 ```math
-\operatorname{BPB} = \frac{\mathcal{L}}{\ln 2}\cdot\frac{\text{tokens}}{\text{UTF-8 bytes}}
+\mathrm{BPB} = \frac{\mathcal{L}}{\ln 2}\cdot\frac{\mathrm{tokens}}{\mathrm{UTF\text{-}8\ bytes}}
 ```
 
 This metric remains tied to the same source encoding, but it helps separate language prediction from token-count changes.
