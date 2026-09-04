@@ -1,0 +1,634 @@
+\documentclass{article}
+\usepackage[preprint,nonatbib]{neurips_2026}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont{Menlo}[Scale=0.82]
+\newfontfamily\kyrgyz{Arial}
+\usepackage{amsmath,amssymb,booktabs,graphicx,tabularx,array}
+\usepackage[table]{xcolor}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{url}
+\usepackage[colorlinks=true,linkcolor=teal!60!black,citecolor=teal!60!black,urlcolor=teal!60!black]{hyperref}
+\hypersetup{pdftitle={Training Tiny Manas: A Small Language Model for a Kyrgyz Epic},pdfauthor={Nikita Nosov},pdfsubject={A retrospective empirical study of small-model training and optimization on Apple Silicon},pdfkeywords={Tiny Manas, Kyrgyz, language model, MPS, RoPE, ablation, reproducibility}}
+\graphicspath{{figures/}}
+\setlength{\emergencystretch}{1.5em}
+\raggedbottom
+\makeatletter\setlength{\@fptop}{0pt}\makeatother
+\setlist{nosep,leftmargin=*}
+\newcommand{\model}{Tiny Manas}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\tabnote}[1]{\par\smallskip{\footnotesize #1}\par}
+\title{Training Tiny Manas:\\A Small Language Model for a Kyrgyz Epic}
+\author{Nikita Nosov\\\url{https://nik1t7n.com}\\\small Technical report · September 4, 2026}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+I built Tiny Manas to understand language models by training one from scratch on a single Kyrgyz epic, rather than by adapting a large pretrained assistant. This report reconstructs the complete experiment sequence: a corrected one-batch memorization check, a rapidly overfitting 10,000-token pilot, full-epic capacity and context comparisons, eleven optimization investigations, and a subsequent quality-driven reevaluation of positional encoding and normalization. The language-model corpus contains 465,069 tokens from one Manas edition, encoded with a frozen 32,768-entry byte-level BPE tokenizer. On an Apple M5 with 16 GB of unified memory, increasing the model from 13.2M to 26.9M parameters improved held-out prediction, whereas doubling context to 512 tokens did not. BF16 training reduced paired training-loop time by 20.58\% with nearly unchanged validation loss. A later controlled RoPE run reduced validation perplexity from 77.15 to 61.30; its selected checkpoint reached test perplexity 92.88. The resulting 26,779,392-parameter decoder retains LayerNorm, GELU, and ordinary multi-head attention. Last-position projection and request-local KV caching improve inference; checkpointing remains optional. Smaller vocabularies, the tested compiler route, SwiGLU, and a short GQA adaptation did not justify adoption. I document failed measurements, early stopping decisions, exact evaluation denominators, and the limits of single-seed comparisons. The result is a working epic-text generator and an auditable engineering study, not a general Kyrgyz assistant or evidence of reliable narrative understanding.
+\end{abstract}
+
+\section{Introduction}
+I had used AI systems extensively before I could explain, line by line, how their weights learned to predict text. Tiny Manas became my first concrete milestone in closing that gap. Small Shakespeare models are a familiar educational starting point; I wanted the analogous experiment to begin with a text from my own linguistic context: \emph{Manas}.
+
+The initial question was deliberately narrow: can I build the complete path from a real corpus to useful next-token predictions on my own computer? Once that path worked, a second question became more interesting: which widely recommended improvements actually help this small model on Apple Silicon? A technique can be valuable in a large CUDA workload and still be slower, unnecessary, or harmful under a different implementation and budget.
+
+I therefore treated each change as a question rather than an upgrade by definition. The sequence also exposed a flaw in my own selection procedure. I initially stopped RoPE after a modest timing regression, without measuring its learned prediction quality. Reopening that decision produced the strongest architectural improvement in this study. The lesson is not to disregard cost, but to avoid confusing a cost measurement with an answer about quality.
+
+This is a retrospective, artifact-backed technical report. The model design uses established Transformer components; I do not propose a new architecture or claim state-of-the-art Kyrgyz performance. My contribution is an end-to-end implementation record, controlled local comparisons, retained negative results, and an explicit account of where the measurements support a conclusion and where they do not. The implementation, configurations, and experiment reports are maintained in \href{https://github.com/nik1t7n/tiny-manas}{the Tiny Manas repository}.
+
+\section{Data and tokenization}
+\label{sec:data}
+\subsection{Two corpora with different jobs}
+A tokenizer learns how to divide text into reusable pieces. A language model learns how those pieces follow one another. These are separate training problems, and their data budgets must not be conflated.
+
+Before this project, I built a Kyrgyz byte-level BPE tokenizer. The version used here was trained through the tokenizer project's original corpus-v1 pipeline, not its later bilingual experiments. That corpus contains 188,208 documents and 524,284,895 UTF-8 bytes. Its training split contains 186,360 documents and 518,527,574 bytes; its validation split contains 1,848 documents and 5,757,321 bytes. Table~\ref{tab:tokenizer-corpus} records the complete selected mixture before that split.
+
+\begin{table}[ht]
+\caption{The earlier tokenizer corpus. These texts trained the tokenizer, not Tiny Manas's language-model weights. Source shares refer to bytes.}
+\label{tab:tokenizer-corpus}
+\centering\small
+\begin{tabular}{lrrr}
+\toprule Source & Documents & UTF-8 bytes & Share \\
+\midrule
+FineWeb2, \code{kir\_Cyrl} & 52,374 & 236,088,121 & 45.03\% \\
+Kyrgyz Wikipedia & 74,322 & 136,746,810 & 26.08\% \\
+Kyrgyz News Corpus & 60,771 & 131,071,033 & 25.00\% \\
+Manas-UdS & 741 & 20,378,931 & 3.89\% \\
+\midrule Total & 188,208 & 524,284,895 & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The tokenizer corpus pipeline used normalized-text hashing for exact duplicates and verified word-shingle similarity for near duplicates. It removed 18,777 near-duplicate documents before final selection. These operations belong to the earlier tokenizer build; I did not rerun them or claim a newly deduplicated language-model benchmark. Manas material is present in that tokenizer corpus. Consequently, a passage held out from LM weight training is \emph{not} necessarily unseen by the tokenizer-learning process.
+
+The frozen tokenizer has 256 base-byte entries and 32,512 additional BPE entries, for 32,768 total. It uses no special/chat tokens and no text normalization. Rare text remains representable through byte pieces. Its complete artifact is pinned by commit and SHA-256 (Appendix~\ref{app:provenance}); I did not silently replace it with the tokenizer repository's newer default. The full cleaned epic uses 9,593 distinct vocabulary IDs, but the model still predicts over all 32,768 entries.
+
+\subsection{The actual language-model corpus}
+For LM training I selected only document \code{Manas01} from the Manas-UdS archive \code{kyrgyz\_2022\_10\_03.zip}. Source metadata identifies \emph{Manas}, Sayakbai Karalaev, and a 2010 edition. The parser reads the surface-token column of the VRT source, reconstructs sentences, repairs punctuation spacing, and joins sentences with spaces. Thus the processed representation does not preserve the original page or verse-line layout.
+
+I removed the introductory material at one verified, unique epic-start heading. This excluded 30,877 leading characters. The resulting text contains 1,794,194 characters, 3,249,652 UTF-8 bytes, and 465,069 tokenizer tokens. Exact encode/decode round trips were required for both the reconstructed document and the selected epic.
+
+\begin{table}[ht]
+\caption{Chronological LM splits. The tokenizer is fixed; token IDs are stored as little-endian unsigned 16-bit integers.}
+\label{tab:splits}\centering\small
+\begin{tabular}{lrrl}
+\toprule Split & Tokens & Decoded UTF-8 bytes & Role \\
+\midrule
+Training & 418,562 & 2,924,452 & Weight updates \\
+Validation & 23,253 & 164,489 & Selection and comparisons \\
+Test & 23,254 & 160,711 & Post-selection reporting \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The full experiment uses a 90/5/5 chronological split, not randomly shuffled fragments across splits. Training windows stay inside the training prefix. The 10k pilot instead uses the first 10,000 tokens, split into 9,000 training and 1,000 validation tokens, with no separate test set. Pilot losses and full-corpus losses therefore describe different held-out text and are not directly comparable.
+
+The source records describe Manas-UdS as CC BY-NC-SA 4.0. Other tokenizer sources have their own terms, including non-commercial components. I preserve provenance and do not redistribute these text payloads in the code repository. This report does not grant commercial rights to the corpus or resolve the legal status of trained weights. Exact locks and source-specific notices are retained rather than replaced by one blanket dataset license.
+
+\section{Model: a small pre-normalized decoder}
+\label{sec:model}
+The main computational object is a vector for each token position. Attention lets that position collect information from earlier positions; a feed-forward network transforms the collected features. Residual additions preserve the incoming representation and add the new message. Eight repetitions refine the representation before a vocabulary projection produces next-token scores.
+
+Tiny Manas follows the decoder-only, pre-normalized design associated with GPT-2~\cite{gpt2}, using the causal attention mechanism introduced by Vaswani et al.~\cite{attention}. There is no encoder and no cross-attention. I used nanoGPT~\cite{nanogpt} as an implementation reference for a compact decoder, tied embeddings, initialization, and optimizer grouping, while maintaining a separate data, training, experiment, and serving implementation.
+
+\begin{figure}[ht]
+\centering\includegraphics[width=\linewidth]{architecture.pdf}
+\caption{The current native model, after the RoPE reevaluation. (a) Each residual route starts \emph{before} normalization and returns after its sublayer's dropout. (b) Query and key vectors receive rotary position transformations; value vectors do not. Attention-weight dropout is distinct from the output dropout in (a). All dropout is disabled for evaluation and generation. This is an original diagram of the implementation, not the encoder--decoder figure from the original Transformer paper.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{From token IDs to context-dependent vectors}
+Let $B$ be the microbatch size, $T\leq256$ its sequence length, $C=384$ the residual width, $H=8$ the number of heads, and $d=C/H=48$ the width of one head. A lookup into $E\in\mathbb{R}^{32768\times384}$ maps IDs to $X\in\mathbb{R}^{B\times T\times384}$. The original model added a learned position table $P\in\mathbb{R}^{256\times384}$ before embedding dropout. The current model removes $P$ and places positional information inside attention through RoPE.
+
+Using row-vector notation, each block first normalizes its input $Z=\mathrm{LN}(X)$ and computes
+\begin{equation}
+ Q=ZW_Q+b_Q,\qquad K=ZW_K+b_K,\qquad V=ZW_V+b_V.
+\end{equation}
+The implementation packs these projections into one linear operation and reshapes each output into $(B,H,T,d)$. These are computed activations, not permanent query/key/value tables for vocabulary items. Each head uses all 384 input features to create its own 48-feature representation.
+
+For the current model, pair $j$ in a query or key at position $m$ is rotated by angle $m\omega_j$, where $\omega_j=10000^{-2j/d}$ and $j=0,\ldots,d/2-1$:
+\begin{equation}
+\begin{pmatrix}\widetilde u_{2j}\\\widetilde u_{2j+1}\end{pmatrix}
+=\begin{pmatrix}\cos(m\omega_j)&-\sin(m\omega_j)\\\sin(m\omega_j)&\cos(m\omega_j)\end{pmatrix}
+\begin{pmatrix}u_{2j}\\u_{2j+1}\end{pmatrix},\qquad u\in\{q,k\}.
+\label{eq:rope}
+\end{equation}
+The relative rotation enters the query--key dot product: $(R_mq)^\top(R_nk)=q^\top R_{n-m}k$. This is the positional mechanism studied by Su et al.~\cite{rope}. My implementation uses adjacent pairs, precomputed non-trainable sine/cosine buffers, and FP32 rotation arithmetic before restoring the incoming query/key dtype. This description does not imply that the trained model supports longer contexts: the configured and tested limit remains 256.
+
+Within each head the context message is
+\begin{equation}
+ A=\mathrm{softmax}\!\left(\frac{\widetilde Q\widetilde K^\top}{\sqrt{48}}+M\right),
+ \qquad U=\mathcal{D}_{0.2}(A)V,\qquad
+ M_{ij}=\begin{cases}0&j\leq i,\\-\infty&j>i.\end{cases}
+\label{eq:attention}
+\end{equation}
+The mask prevents a training position from reading its future answer. Softmax operates over keys, giving each query a distribution over allowed positions \emph{before} dropout. Head outputs are concatenated into 384 features and projected by $W_O$. The native implementation calls scaled dot-product attention; this does not by itself establish that a particular FlashAttention kernel ran on MPS.
+
+\subsection{Normalization, feature transformation, and residual paths}
+LayerNorm~\cite{layernorm} independently normalizes the $C$ features of each token, with learned gain and bias:
+\begin{equation}
+\mathrm{LN}(x)=\gamma\odot\frac{x-\mu(x)}{\sqrt{\sigma^2(x)+10^{-5}}}+\beta.
+\end{equation}
+The two residual operations are
+\begin{align}
+ X'&=X+\mathcal{D}_{0.2}\!\left(\mathrm{Concat}(U_1,\ldots,U_8)W_O+b_O\right),\\
+ X^{\mathrm{next}}&=X'+\mathcal{D}_{0.2}\!\left(\mathrm{GELU}(\mathrm{LN}(X')W_1+b_1)W_2+b_2\right).
+\end{align}
+The FFN expands 384 features to 1,536 and projects back to 384. It operates at each position with the same weights; it does not read other positions directly. I retain the ordinary GELU FFN because the parameter-matched SwiGLU experiment did not improve this recipe.
+
+Dropout~\cite{dropout} is present at embeddings, attention weights, attention output, and FFN output. Here $p=0.2$ denotes the \emph{drop probability}, unlike the retention-probability notation in parts of the original paper. During training, $\mathcal{D}_p(z)=m\odot z/(1-p)$ with independent $m_i\sim\mathrm{Bernoulli}(1-p)$; during evaluation it is the identity. The scaling preserves the expectation, not the exact magnitude of every sampled vector. After attention dropout, a realized attention row need not sum to one.
+
+A final LayerNorm precedes the bias-free LM head. Its weights are tied to $E$, so logits are $\mathrm{LN}(X^{(8)})E^\top$. Tying prevents a second 12.58M-parameter vocabulary matrix. Appendix~\ref{app:math} gives the complete parameter accounting and optimizer equations.
+
+\section{Training and evaluation protocol}
+\label{sec:protocol}
+\subsection{What the model is trained to do}
+For a sampled slice $(s_0,\ldots,s_T)$, the input is $(s_0,\ldots,s_{T-1})$ and the target is $(s_1,\ldots,s_T)$. Every input position contributes one next-token prediction. The mean negative log-likelihood is
+\begin{equation}
+\mathcal{L}(\theta)=-\frac{1}{BT}\sum_{b=1}^{B}\sum_{t=0}^{T-1}
+\log p_\theta(s_{b,t+1}\mid s_{b,0:t}).
+\label{eq:loss}
+\end{equation}
+The implementation passes logits directly to full-vocabulary cross-entropy. It does not select a sampled next token during training. Backpropagation computes parameter gradients; AdamW~\cite{adamw} then updates the parameters. Ordinary matrix parameters receive weight decay, while one-dimensional biases and normalization parameters do not.
+
+For the main 27M comparisons, $B=8$ and two microbatches accumulate before one optimizer update. Each microbatch loss is divided by two before backward, yielding $8\times256\times2=4,096$ target positions per update. The 3,000-update budget exposes the model to 12,288,000 sampled targets: roughly 29.36 times the number of training tokens, \emph{not} 12.3 million distinct tokens or exactly 29.36 sequential epochs.
+
+\begin{table}[ht]
+\caption{Main training recipe. One controlled variable changes per principal comparison unless the report explicitly identifies a different protocol.}
+\label{tab:recipe}\centering\small
+\begin{tabularx}{\linewidth}{lX}
+\toprule Setting & Value \\
+\midrule
+Hardware / backend & Apple M5, 16 GB unified memory; PyTorch 2.13.0, strict MPS \\
+Initialization / sampling seeds & 1337 / 1338 for training windows \\
+Optimizer & AdamW, $\beta_1=0.9$, $\beta_2=0.95$, weight decay $0.1$ \\
+Learning rate & 100-step linear warmup to $3\times10^{-4}$; cosine decay toward $3\times10^{-5}$ over the 3,000-step recipe \\
+Gradient norm clipping & Global norm capped at 1.0 after accumulation \\
+Initialization & Normal $\sigma=0.02$; zero linear biases; residual projections use $0.02/\sqrt{2L}$ \\
+Precision & Initially FP32; BF16 autocast accepted for training; evaluation and inference FP32 \\
+Checkpoint selection & Lowest scheduled validation loss; normally 30 batches every 100 updates \\
+Quality evaluation & 100 additional random batches, FP32; seed 1837 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The model's parameters and AdamW states remain FP32 under mixed precision; BF16 is not a conversion of the entire training state. The generic code still supports FP32 for old experiments. The original full-corpus runs had patience-based early stopping, but all three reached 3,000 updates. Later controlled full comparisons disabled that early stop so both arms received the same budget. The pilot and diagnostic overfit run have their own smaller configurations (Appendix~\ref{app:registry}).
+
+\subsection{Three evaluation quantities that must stay separate}
+\label{sec:metrics}
+\textbf{Scheduled validation} selects a checkpoint using 30 random batches. \textbf{Additional validation} evaluates that checkpoint on 100 batches with a separate sampler seed: 204,800 target positions at $B=8,T=256$. This is a larger resampling of the \emph{same} validation suffix, not a new independent dataset. Repeated windows and overlapping contexts mean these target positions are not 204,800 independent observations.
+
+\textbf{Perplexity} is $\exp(\mathcal{L})$; lower is better for the same tokenization and evaluation protocol. A 0.02-nat loss reduction corresponds to about a 1.98\% perplexity reduction. Neither perplexity nor next-token top-1 accuracy measures factuality, instruction following, or narrative coherence.
+
+For comparisons across tokenizers, the unit of prediction changes. I therefore use exact-byte scoring:
+\begin{equation}
+\mathrm{BPB}=\frac{\sum_{i\in\mathcal{S}}-\log p_\theta(s_i\mid\mathrm{context}_i)}{\ln(2)\,N_{\mathrm{UTF8}}}.
+\label{eq:bpb}
+\end{equation}
+Here all candidates score the same original target bytes, each target once, using at most 256 context tokens and 128 scored targets per evaluation window. A common 129-byte validation prefix supplies initial context, leaving 164,360 scored bytes. This is different from the historical approximation that multiplied random-batch mean token loss by the whole split's average tokens per byte. I do not pool those two BPB definitions in a table. The final test's stored byte-normalized field is still the historical approximation; the main test claims use loss and perplexity.
+
+Test reporting occurs after each relevant selection phase, never inside the staged RoPE/RMSNorm rules. However, the same chronological suffix was already examined in the earlier capacity study. It is not a newly sequestered, never-before-seen final benchmark. The entire research sequence is adaptive and single-seed; I do not report statistical significance or seed-level error bars that were never measured.
+
+\section{From a broken measurement to a working language model}
+\label{sec:initial}
+\subsection{E0--E2: validate the loop before scaling it}
+The first real-data smoke produced logits of shape $(4,64,32768)$ and loss 10.4317, near the uniform-vocabulary value $\ln(32768)=10.3972$. Backward was finite. In a bounded causal check, changing future tokens left the inspected prefix logits unchanged. This established a usable execution path, not learned language ability.
+
+I then asked the smallest useful training question: can the model intentionally memorize one real batch? The first attempt appeared to fail. In fact, optimization loss had already fallen from 10.4385 to 0.0280 by update 100, while the periodic ``training'' evaluator reported an unrelated high loss. It was drawing a different fixed batch with another seed. The stopping rule was observing the wrong exercise.
+
+After correcting the sampler identity, the 4.60M-parameter, two-block model reached loss 0.02673 and 100\% top-1/top-5 accuracy on its fixed batch at update 100. Training stopped after 25,600 target positions and 1.89 seconds of measured loop time. This is deliberate memorization, not a validation success. The invalid first summary remains in the experiment record instead of being silently replaced.
+
+The 8.10M-parameter pilot used four blocks, width 192, context 128, and dropout 0.2 on the first 10,000 tokens. It made useful initial progress, then memorized the small training prefix. Best scheduled validation loss was 7.3231 at update 200; by update 1,000, training loss had fallen to 0.1235 while validation loss had climbed to 10.4687. Eight unsuccessful evaluations triggered early stopping. A separate 50-batch check of the best checkpoint gave loss 7.3369. Better-looking snippets from the final overfit checkpoint did not override the held-out result.
+
+\begin{figure}[ht]
+\centering\includegraphics[width=\linewidth]{learning-curves.pdf}
+\caption{Observed scheduled evaluation curves, extracted from saved metrics. (a) The pilot's training and validation losses separate sharply; its validation text differs from the full-corpus study. (b) Full-Manas01 comparisons show why capacity and context need separate evaluation. The RoPE line comes from the later controlled study, not the original FP32 capacity run. Lines connect recorded checkpoints; no smoothing, synthetic points, or uncertainty bands are added.}
+\label{fig:learning}
+\end{figure}
+
+\subsection{E3--E5: more data, longer context, or more capacity?}
+Moving to the complete epic and the planned 13.2M configuration produced a functioning Manas-style generator. This step changed both data and model size, so it is not an isolated causal estimate of the benefit of more data. It established a baseline for the next controlled choices.
+
+\begin{table}[ht]
+\caption{Original full-corpus experiments, all FP32 with 3,000 updates and 12,288,000 sampled targets. Losses use the additional held-out evaluation, not the lower scheduled checkpoint-selection score.}
+\label{tab:original}\centering\small
+\begin{tabular}{lrrrrr}
+\toprule Model / context & Parameters & Val. loss & Val. PPL & Test PPL & Loop min. \\
+\midrule
+13M / 256 & 13,193,216 & 4.6384 & 103.38 & 151.42 & 15.10 \\
+13M / 512 & 13,258,752 & 4.7268 & 112.94 & 171.85 & 17.22 \\
+27M / 256 & 26,877,696 & 4.3457 & 77.15 & 116.45 & 24.45 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Doubling context from 256 to 512 retained width 256 and six layers. I halved the microbatch from eight to four, keeping two accumulation steps and 4,096 targets per update. The longer position table added 65,536 parameters. Validation and test prediction both worsened, and target throughput fell from 13,565 to 11,894 per second. The longer window also means fewer independent sampled windows per update; this is a fixed-target-budget comparison, not a universal claim that long context is harmful.
+
+I next retained context 256 and increased depth to eight and width to 384. Test perplexity fell from 151.42 to 116.45, and validation perplexity from 103.38 to 77.15, at a throughput cost: 8,378 targets per second. The original 27M model was the best tested full-corpus configuration at this stage. Its best checkpoint was update 2,900, not the final update. That checkpoint and the original source checkout were frozen before optimization.
+
+These measurements answered the local engineering question: additional capacity helped this recipe more than a longer context did. They do not identify a scaling law or an optimal parameter count. Only two capacity settings and one longer-context alternative were evaluated.
+
+\section{Optimization study: speed, memory, and correctness}
+\label{sec:systems}
+I separated equivalent execution changes from architectural changes. An equivalent execution path must preserve the intended computation before a timing result matters. An architectural change can alter learned quality, so shape correctness or a fast forward pass is not enough to accept it.
+
+\begin{table}[ht]
+\caption{Systems experiments on the original 27M architecture. Timing definitions differ by row and are not additive. Allocation samples are not total-process peaks.}
+\label{tab:systems}\centering\small
+\begin{tabularx}{\linewidth}{lXXl}
+\toprule Change & Measurement & Observed result & Decision \\
+\midrule
+O01: last logits & FP32 forward, $B=1,T=256$ & 7.307 to 5.894 ms; output 32 MiB to 128 KiB & Adopt \\
+O02: BF16 & Matched full training-loop time & 1,548.042 to 1,229.405 s; val. $+0.0000464$ nats & Adopt \\
+O03: compile & Warm paired update median & 0.323650 to 0.333425 s after correctness repair & Reject \\
+O04: recompute & Update median / live allocation samples & $+30.63\%$ latency; $-38.46\%$ allocation & Optional \\
+O09: KV cache & 32-token prompt + 64 generated & 0.196746 to 0.170108 s; 1.1566$\times$ & Adopt \\
+O11: fused loss & Conditional bottleneck assessment & No blocking logit-memory constraint measured & Not run \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{O01--O02: avoid discarded logits; use BF16 selectively}
+During generation, earlier-position vocabulary scores are discarded. Slicing hidden states \emph{before} the LM head reduces output storage from $BTV$ values to $BV$ while leaving training unchanged. Numerical comparisons and greedy continuations passed on real prompts, including context overflow. At $T=1$ there is nothing to save and the microbenchmark was slightly slower; I do not claim a context-independent speedup.
+
+BF16 was first tested for 100 paired updates, then for two fresh, matched 3,000-update runs. Forward autocast changed, but FP32 evaluation, initialization, training windows, dropout rate, and optimizer recipe did not. The full-loop time fell by 20.58\%, while additional validation losses were 4.345732722 (FP32) and 4.345779147 (BF16). This is a local throughput improvement with near-equal prediction quality, not an improvement in model intelligence.
+
+The memory result depends on where it was sampled. The short probe's within-step live allocation fell only 2.1\%; full-run after-update samples fell 33.83\%, while driver allocation rose 0.36\%. I retain those definitions rather than claiming BF16 halved training memory. The 20 saved outputs from each full run were reviewed; their general failure modes remained similar, although individual continuations changed substantially.
+
+\subsection{O03--O04: correctness failures that a loss scalar missed}
+The first compiled MPS attempt had a small loss difference but a relative gradient error of 1.33376. A named-gradient diagnosis localized a large discrepancy to broadcasting the positional embedding lookup. A research-only rewrite explicitly indexed positions at shape $(B,T)$, reducing relative gradient error to 0.00651, within the BF16 gate. The corrected compiler route then ran 3.02\% slower over 30 post-warmup paired updates. With no warmed savings, the compilation cost had no positive break-even point. I retained eager execution. This result is specific to the installed backend, expression, and shapes.
+
+Activation checkpointing~\cite{checkpoint} trades saved intermediates for recomputation during backward. The first MPS attempt reproduced the forward loss but not the gradients: relative error was 0.675827 because recomputation did not preserve the required MPS dropout state. Explicitly saving/restoring device RNG state reduced the corrected error to approximately $6.0\times10^{-9}$. Over 35 real updates per arm, excluding five warmup updates, sampled live allocation fell from 2,099,575,552 to 1,292,135,680 bytes, while median update time rose from 0.317603 to 0.414878 seconds.
+
+The corrected option is integrated but disabled by default. The accepted small model already fits; spending roughly 31\% more update time for unused memory headroom would not serve this experiment. Neither this result nor the compile failure is evidence about every MPS version, CUDA, or combined compiled checkpointing.
+
+\subsection{O11: a conditional experiment need not become a benchmark}
+At $B=8,T=256,V=32768$, one BF16 logits tensor occupies 128 MiB; the FP32 equivalent occupies 256 MiB. That is substantial, but the observed model fit within the configured budget. I considered fused/chunked cross-entropy, including Cut Cross-Entropy~\cite{cce}, and did not implement a new loss kernel without a measured need. No fused-loss runtime result exists. A streamed full-vocabulary loss and optional backward approximations also require separate numerical claims; I do not label every implementation ``exact'' without qualification.
+
+\section{O05: vocabulary size under an equal-text budget}
+\label{sec:vocab}
+A smaller vocabulary shrinks the tied embedding/head matrix, but makes the same text longer in tokens. Equal optimizer steps would then expose candidates to different amounts of original text. I used an equal-text experiment instead of treating per-token perplexity as comparable across vocabularies.
+
+The earlier tokenizer project already contained nested 32k, 16k, and 8k BPE variants trained on the same corpus with the same preprocessing. Their recorded artifacts and shard hashes were verified; no new tokenizer training was required. I preserved the original \emph{byte} boundaries of the train/validation/test text before retokenizing. Thirty complete passes over the same scored training bytes were used for each candidate, with learning rate scheduled by text exposure. A shared 126-byte training prefix remained unscored. Each arm processed 87,729,780 scored source bytes.
+
+Non-overlapping training windows were shuffled per pass. Short final windows used ignored targets, not a new padding token, and accumulated losses were weighted by actual target counts. Shared Transformer tensors were initialized identically; matching embedding IDs inherited matching fresh rows. Depth, width, and 256-token context stayed fixed, but vocabulary capacity and the number of updates necessarily differed.
+
+\begin{table}[ht]
+\caption{Equal-text tokenizer comparison. ``Incumbent'' uses the earlier random-window recipe and serves as a deployment quality floor, not as the controlled tokenizer arm. All BPB values use the same 164,360 target bytes.}
+\label{tab:vocab}\centering\small
+\begin{tabular}{lrrrrr}
+\toprule Model & Params (M) & Updates & Val. BPB & Bytes/s & Alloc. (GiB) \\
+\midrule
+32k incumbent & 26.878 & 3,000 & 0.87644 & --- & --- \\
+32k equal-text & 26.878 & 3,090 & 0.92129 & 82,253 & 2.10 \\
+16k equal-text & 20.586 & 3,420 & 0.91285 & 95,484 & 1.68 \\
+8k equal-text & 17.441 & 3,840 & 0.91012 & 99,115 & 1.58 \\
+\bottomrule
+\end{tabular}
+\tabnote{Bytes/s excludes scheduled validation, checkpoint writes, and generation audit. Allocation is a sampled live tensor quantity, not unified-memory occupancy.}
+\end{table}
+
+\begin{figure}[ht]
+\centering\includegraphics[width=\linewidth]{tokenizer-curves.pdf}
+\caption{Recorded exact-byte validation curves. Smaller vocabularies slightly outperform the fresh 32k arm under the shared equal-text recipe, but none reaches the previously accepted model's quality. The dashed incumbent line is a checkpoint score, not a missing training trajectory.}
+\end{figure}
+
+The 16k and 8k variants improved byte throughput by 16.09\% and 20.50\% over fresh 32k. They also improved BPB by 0.92\% and 1.21\% within that controlled recipe. However, their BPB remained 4.15\% and 3.84\% worse than the incumbent, failing the predeclared 1\% degradation ceiling. I kept the original 32k tokenizer and random-window training recipe.
+
+The important negative result is not ``32k is inherently best.'' The fresh 32k control itself was 5.12\% worse than the incumbent. Sampling, schedule, and selection changed between those recipes. The controlled comparison supports a resource/quality tradeoff among vocabulary sizes; the separate incumbent floor prevents adopting a worse delivered model. It cannot identify which recipe change caused the control regression. Sixty candidate continuations were inspected, but equal generated-token budgets produced different byte lengths, limiting copying and repetition comparisons.
+
+\section{Architectural alternatives and the quality-gate correction}
+\label{sec:architecture-results}
+\subsection{O06--O07: why I reopened RoPE and RMSNorm}
+The initial numerical/cost gates accepted the mathematical implementations of RoPE and RMSNorm but stopped before full training: their measured updates were 12.27\% and 10.70\% slower. That was sufficient to reject a speed claim, not to reject a possible quality gain. I revised the policy and recorded a bounded quality-followup protocol before continuing.
+
+Candidates started from a saved \emph{fresh initializer}, not a trained checkpoint. The same 3,000-step learning-rate schedule remained in force during short prefixes of the run; I did not compress the schedule into a pilot and then extrapolate its results. A 100-update control calibration reproduced the archived BF16 trajectory closely: the largest checked train-point difference was 0.0001164 nats, and the validation difference was approximately 0.0000065. I reused that full historical control instead of paying for another indistinguishable full run.
+
+Validation was checked every 100 updates. No quality pruning occurred before update 600. From update 900 onward, a candidate without a material improvement and without an improving relative gap could stop; a promising candidate had to pass the 1,500-update gate and then complete 3,000 updates. The practical gain floor was 0.02 nats, not a statistical confidence threshold. Appendix~\ref{app:stopping} records the rules. This is a small, predeclared staged allocation policy in the spirit of early resource allocation~\cite{hyperband}, not an implementation of Hyperband.
+
+\begin{figure}[ht]
+\centering\includegraphics[width=\linewidth]{staged-quality.pdf}
+\caption{Quality-followup trajectories relative to the matched archived BF16 control. RoPE has a persistent improvement and earns the full budget. RMSNorm remains close to the control and stops at 900 updates. The plotted points are correlated scheduled evaluations; their number does not replace multiple training seeds.}
+\label{fig:staging}
+\end{figure}
+
+\subsection{RoPE: a full-budget improvement}
+RoPE's recent three-check mean loss advantage was already 0.34082 nats at update 600 and remained substantial at later gates. It completed 3,000 updates and selected update 2,900. The final additional-validation loss fell from 4.34577915 to 4.11583555: a 0.22994360-nat reduction and a 20.54\% reduction in perplexity. Exact-byte BPB fell from 0.87644231 to 0.82769511. The 20-generation audit did not reveal a new class of collapse, although it did not establish better human-rated coherence.
+
+\begin{table}[ht]
+\caption{The accepted architecture change. Both models use the same 32k tokenizer, 256-token context, and 3,000-update BF16 recipe. Test scores were reported after selection.}
+\label{tab:rope}\centering\small
+\begin{tabular}{lrr}
+\toprule Measurement & Learned positions & RoPE \\
+\midrule
+Parameters & 26,877,696 & 26,779,392 \\
+Additional validation loss & 4.345779 & 4.115836 \\
+Additional validation perplexity & 77.152 & 61.303 \\
+Exact-byte validation BPB & 0.876442 & 0.827695 \\
+Test loss & 4.757561 & 4.531258 \\
+Test perplexity & 116.461 & 92.875 \\
+Mean repeated-trigram ratio & 4.097\% & 4.134\% \\
+Maximum normalized matching span & 9 words & 11 words \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The followup cost probe measured 0.332212 seconds per classic update and 0.365056 for RoPE, a 9.89\% regression in that session. It does not erase the earlier 12.27\% measurement; shared-host conditions and short probes vary. RoPE's saved segments total 1,101.24 seconds of \emph{update-only} training time, excluding evaluation, checkpointing, and audits. Comparing that narrower total with the BF16 control's complete loop time would incorrectly turn a slower operation into a speedup.
+
+I integrated the measured candidate into the native model, preserving initializer order so shared tensors match the research initializer. Native and research checkpoint logits matched exactly in the recorded CPU conversion check. Cache parity was also checked, including overflow. The accepted inference artifact contains 26,779,392 parameters; its post-selection test top-1 and top-5 accuracies are 31.70\% and 48.53\%. These are token-prediction accuracies, not reading-comprehension scores.
+
+\subsection{RMSNorm: a budget stop, not a universal rejection}
+RMSNorm~\cite{rmsnorm} rescales by root-mean-square magnitude without subtracting the mean. Its lower algebraic complexity did not produce faster updates in this implementation. In the reopened run, the last three validation deltas at updates 700, 800, and 900 were $+0.002686$, $+0.003778$, and $+0.003471$ nats. Their mean, $+0.003312$, was close to the LayerNorm control and did not cross the practical gain floor. Relative-gap improvement versus the preceding three checks was only 0.002947 nats.
+
+The rule stopped RMSNorm at update 900, saving 2,100 remaining updates (70\% of its planned full budget). I retained LayerNorm. I did \emph{not} measure RMSNorm's 3,000-update performance, final generations, or test score. A late crossover remains possible; the result supports this resource-allocation decision, not a claim that RMSNorm cannot improve a differently tuned model.
+
+\subsection{O08 and O10: tested alternatives that did not earn adoption}
+SwiGLU~\cite{swiglu} replaces the GELU FFN with a gated product. To compare similar capacity, I used hidden width 1,024 rather than the GELU path's 1,536: three projection matrices replace two. Including biases, the candidate has 26,881,792 parameters, only 4,096 above the classic model. The controlled cost probe was 3.80\% slower with 8.82\% more sampled allocation. After all 3,000 updates, additional-validation loss was 4.427423, worse than GELU by 0.081643 nats. Mean repeated trigrams rose from 4.10\% to 6.95\%, with a worst sample of 52.78\%. I retained GELU. This full negative result is stronger than an early flat curve, but remains specific to the fixed recipe and single seed.
+
+GQA~\cite{gqa} instead shares key/value projections among query heads. I converted the accepted learned-position MHA checkpoint by mean-pooling K/V weights and biases from each group of four heads, retaining eight query heads and two KV heads. This was a \emph{checkpoint adaptation} experiment, not training GQA from scratch. Both converted GQA and unchanged MHA received 150 updates, fresh AdamW states, identical windows, and a fixed learning rate of $3\times10^{-5}$.
+
+Persistent FP32 cache storage fell from 6 to 1.5 MiB. Interleaved decode timing was 1.10\% slower, within the latency tolerance. Prediction did not recover sufficiently: GQA's final validation loss on the exact-byte windows was 4.497047 versus adapted MHA's 4.303030, a 0.194018-nat gap above the 0.05 ceiling. GQA's loss had improved from 5.074695 immediately after conversion, so adaptation helped, but not enough. I retained MHA. These results do not answer whether a longer adaptation, another grouping, or fresh GQA pretraining would succeed; none was run.
+
+\section{Inference, generated text, and release integrity}
+\label{sec:inference}
+\subsection{A cache with a declared context policy}
+Prefill processes the prompt and stores every block's keys and values. Decode computes one new token's states, appends its K/V, and attends to cached history. The cache belongs to one request. At full length its storage is
+\begin{equation}
+2BLH_{\mathrm{KV}}Td\cdot4
+=2\cdot1\cdot8\cdot8\cdot256\cdot48\cdot4
+=6{,}291{,}456\ \text{bytes}.
+\end{equation}
+The factor two counts K and V; four is FP32 bytes per value. GQA reduces the stored KV-head count, not the number of query heads or all temporary attention work. The tested MPS GQA route expanded K/V before ordinary attention, so its fourfold persistent-cache saving was never a fourfold total-memory claim.
+
+\begin{figure}[ht]
+\centering\includegraphics[width=\linewidth]{cache.pdf}
+\caption{The declared inference contract. Cached decoding accelerates growth within the trained window. Once the fixed 256-token context is full, the implementation rebuilds from the cropped text to preserve equivalence with uncached generation. It does not silently substitute a longer-history model.}
+\end{figure}
+
+This crop policy is consequential. Learned positions change after a crop; even with RoPE, deeper retained states still contain information from evicted tokens. Simply deleting the oldest cache entries would not reproduce a fresh forward pass over the cropped window. The implementation therefore rebuilds at overflow. On the learned-position checkpoint, caching accelerated a 32-token prompt plus 64 generated tokens by 1.1566$\times$, but a 248-token prompt plus 64 outputs by only 1.0165$\times$. A single-token decode after 128 prior positions improved from 3.31775 to 2.57654 ms. These are synchronized local model timings, not HTTP throughput and not a new benchmark of the later RoPE checkpoint.
+
+\subsection{What generated text does and does not show}
+The common generation audit uses five prompts, four sampling seeds, temperature 0.8, top-$k$ 40, and 256 new tokens per continuation. Prompts include the hero's name, Bakai, a dialogue opening, and an action opening. The complete prompt/seed list is in Appendix~\ref{app:audit}. Temperature rescales logits before softmax; top-$k$ restricts the candidates. Generation then samples one token, appends it, and repeats. No SFT, preference optimization, RLHF, retrieval, or external language model is involved.
+
+The current model reliably produces epic-associated names and short action or dialogue fragments. It also changes actors abruptly, forms malformed endings, repeats titles, and fails to maintain long narrative state. These qualitative observations come from reading the saved outputs; I have no blinded native-speaker fluency or coherence study. A sample with zero repeated trigrams can still wander semantically.
+
+The copying audit itself required correction. The old matcher normalized generated words but searched an unnormalized source string, missing matches across punctuation and line breaks. Symmetric word normalization changed the frozen 27M audit's maximum matching span from seven to nine words. Nine of its 20 per-sample counts changed. A bounded real-source positive control then matched all 142 words. I re-audited saved outputs rather than regenerate them under new randomness. Current copying results describe case-folded, punctuation-insensitive whole-word spans, \emph{not} exact byte copying. An observed maximum of eleven words in 20 RoPE samples cannot establish an absence of memorization elsewhere.
+
+\subsection{The delivered model is an identified artifact}
+The native RoPE export is 107,157,586 bytes, with a recorded SHA-256 distinct from its optimizer-bearing research checkpoint. The release check reloaded it through the actual model path, reproduced logits, and verified greedy cache parity across overflow; maximum recorded cache logit difference was $6.20\times10^{-6}$. The original model artifacts were preserved for rollback.
+
+Serving uses FP32 with bounded generation: one request at a time, 16--128 new tokens, temperature 0.5--1.2, and top-$k$ 1--100. The public website calls an authenticated private model service through its own rate-limited route; it does not send users' requests to another language model. The release record includes a successful public generation smoke. That proves a working path at release time, not sustained concurrency, an inference service-level agreement, or a new quality evaluation.
+
+\section{Discussion and limitations}
+\label{sec:discussion}
+\paragraph{The strongest conclusion is local, not universal.}
+Within a fixed Manas-only recipe, more capacity improved prediction, mixed precision improved cost, and RoPE improved held-out loss. Increasing context, changing the activation, reducing vocabulary, or sharing KV heads did not automatically improve the delivered model. The experiment favors measured tradeoffs over assembling a checklist of fashionable components.
+
+\paragraph{Stopping rules should match the question.}
+Equivalence optimizations can fail on correctness or cost without a full training run. Architectural changes deserve a quality check if a modest cost increase could buy a useful gain. RoPE demonstrates the opportunity cost of the original speed-first filter. RMSNorm demonstrates the complementary limit: a flat early comparison can justify saving resources, but cannot prove that the final ordering would remain unchanged. Reopening a rule must be recorded rather than quietly rewriting the old decision.
+
+\paragraph{Measurement definitions can change a conclusion.}
+Scheduled and additional validation losses differ. Exact-byte BPB and average-ratio approximations differ. Update-only time and full-loop time differ. Sampled allocator values and process-wide peaks differ. Normalized copying and verbatim copying differ. This report keeps those distinctions visible because collapsing them can manufacture an apparent improvement without changing the model at all.
+
+\paragraph{Data and statistical limitations.}
+All substantive LM training uses one edition of one epic. Its formulaic language, related passages, tokenizer exposure, and chronological distribution shift make it a narrow benchmark. Random-window training repeatedly revisits the same text. There is no cross-edition holdout, general Kyrgyz task suite, multi-seed confidence interval, hyperparameter sweep for every candidate, or external baseline study in this report. Validation was repeatedly consulted during development, and the historical test suffix had already been evaluated in earlier phases. The reported gains are evidence for this experimental sequence, not unbiased estimates of performance on an unseen population of tasks.
+
+\paragraph{Hardware and reproducibility limitations.}
+MPS timings were measured on a shared 16 GB M5 host. Sequential full runs can experience different background load and temperature. Interleaved short comparisons reduce, but do not eliminate, this concern. Compiler and RNG observations are tied to the inspected runtime. Saved data, hashes, configurations, and curves enable auditing; exact future floating-point trajectories across platforms are not promised. Raw licensed corpora and weight files are not committed to Git, so public source access alone is not a claim that all artifacts are publicly downloadable.
+
+\paragraph{Use limitations and next experiments.}
+Tiny Manas is unsuitable as a general assistant, a factual reference for the epic, or a reliable Kyrgyz writing tool. Cultural and linguistic material should not be reduced to a claim of ``understanding'' because a small prediction score improves. The next useful work would begin with cleaner/diverse authorized text, cross-edition evaluation, repeated seeds, and explicit human review of coherence. Longer-context, alternative architecture, quantization, batching, and post-training work remain future questions, not completed results.
+
+\section{Conclusion}
+I started by asking whether the training loop could learn one real batch and ended with a named, versioned 26.78M-parameter RoPE decoder that generates Manas-like text. The main value of the project is not the parameter count. It is the ability to trace a result back to its data, computation, checkpoint, and decision rule.
+
+The final model uses a frozen 32k byte-level tokenizer, eight pre-LayerNorm blocks, width 384, eight ordinary attention heads, a GELU FFN, tied embeddings, BF16 training, and FP32 cached inference within a 256-token crop policy. Its validation perplexity is 61.30 and its post-selection test perplexity is 92.88 under the recorded protocol. The gains coexist with weak long-range coherence and substantial evaluation limitations. Recording both is what makes the experiment useful beyond a successful training command.
+
+\section*{Acknowledgments and authorship note}
+I acknowledge the Manas-UdS and other corpus maintainers, the researchers whose methods this implementation uses, and the educational value of Andrej Karpathy's nanoGPT. I used an AI coding assistant for implementation support, experiment operation, evidence collection, and preparation of this manuscript and its figures. Author responsibility and substantive claims remain with Nikita Nosov; this report does not represent independent peer review, conference acceptance, or a native-speaker evaluation.
+
+\begin{thebibliography}{15}
+\small
+\bibitem{attention} Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. \emph{Attention Is All You Need}. NeurIPS, 2017. \href{https://arxiv.org/abs/1706.03762}{arXiv:1706.03762}.
+\bibitem{gpt2} Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, and Ilya Sutskever. \emph{Language Models are Unsupervised Multitask Learners}. OpenAI technical report, 2019. \href{https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf}{Original report}.
+\bibitem{dropout} Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, and Ruslan Salakhutdinov. \emph{Dropout: A Simple Way to Prevent Neural Networks from Overfitting}. Journal of Machine Learning Research, 15:1929--1958, 2014. \href{https://jmlr.org/papers/v15/srivastava14a.html}{JMLR article}.
+\bibitem{layernorm} Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E. Hinton. \emph{Layer Normalization}. 2016. \href{https://arxiv.org/abs/1607.06450}{arXiv:1607.06450}.
+\bibitem{adamw} Ilya Loshchilov and Frank Hutter. \emph{Decoupled Weight Decay Regularization}. ICLR, 2019. \href{https://arxiv.org/abs/1711.05101}{arXiv:1711.05101}.
+\bibitem{checkpoint} Tianqi Chen, Bing Xu, Chiyuan Zhang, and Carlos Guestrin. \emph{Training Deep Nets with Sublinear Memory Cost}. 2016. \href{https://arxiv.org/abs/1604.06174}{arXiv:1604.06174}.
+\bibitem{rope} Jianlin Su, Yu Lu, Shengfeng Pan, Ahmed Murtadha, Bo Wen, and Yunfeng Liu. \emph{RoFormer: Enhanced Transformer with Rotary Position Embedding}. 2021. \href{https://arxiv.org/abs/2104.09864}{arXiv:2104.09864}.
+\bibitem{rmsnorm} Biao Zhang and Rico Sennrich. \emph{Root Mean Square Layer Normalization}. NeurIPS, 2019. \href{https://arxiv.org/abs/1910.07467}{arXiv:1910.07467}.
+\bibitem{swiglu} Noam Shazeer. \emph{GLU Variants Improve Transformer}. 2020. \href{https://arxiv.org/abs/2002.05202}{arXiv:2002.05202}.
+\bibitem{gqa} Joshua Ainslie, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, and Sumit Sanghai. \emph{GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints}. EMNLP, 2023. \href{https://arxiv.org/abs/2305.13245}{arXiv:2305.13245}.
+\bibitem{cce} Erik Wijmans, Brody Huval, Alexander Hertzberg, Vladlen Koltun, and Philipp Krähenbühl. \emph{Cut Your Losses in Large-Vocabulary Language Models}. ICLR, 2025. \href{https://arxiv.org/abs/2411.09009}{arXiv:2411.09009}.
+\bibitem{hyperband} Lisha Li, Kevin Jamieson, Giulia DeSalvo, Afshin Rostamizadeh, and Ameet Talwalkar. \emph{Hyperband: A Novel Bandit-Based Approach to Hyperparameter Optimization}. Journal of Machine Learning Research, 18(185):1--52, 2018. \href{https://jmlr.org/papers/v18/16-558.html}{JMLR article}.
+\bibitem{nanogpt} Andrej Karpathy. \emph{nanoGPT}. Software repository. \href{https://github.com/karpathy/nanoGPT}{github.com/karpathy/nanoGPT}. Consulted as an implementation reference; Tiny Manas is a separate implementation.
+\end{thebibliography}
+
+\clearpage
+\appendix
+\section{Implementation mathematics and parameter accounting}
+\label{app:math}
+\subsection{Exact current parameter count}
+With tied embeddings, linear biases enabled, two LayerNorm modules per block, and a final LayerNorm, the current parameter count is
+\begin{equation}
+N=VC+L(12C^2+13C)+2C
+=12{,}582{,}912+14{,}195{,}712+768
+=26{,}779{,}392.
+\end{equation}
+The classic learned-position model adds $TC=98,304$ parameters, giving 26,877,696. Rotary sine/cosine tables are buffers, not learned parameters.
+
+\begin{table}[ht]
+\caption{Parameter inventory at $C=384$, $L=8$, $V=32768$. Shared tensors are counted once.}
+\centering\small
+\begin{tabular}{lrr}
+\toprule Component & Per block & Whole model \\
+\midrule
+Token embedding / tied LM head & --- & 12,582,912 \\
+Packed QKV projection + bias & 443,520 & 3,548,160 \\
+Attention output + bias & 147,840 & 1,182,720 \\
+FFN up/down projections + biases & 1,181,568 & 9,452,544 \\
+Two LayerNorm gains and biases & 1,536 & 12,288 \\
+Final LayerNorm & --- & 768 \\
+\midrule Total & --- & 26,779,392 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For a full training microbatch, input IDs are $(8,256)$; residual states are $(8,256,384)$; Q, K, and V each have shape $(8,8,256,48)$; and logits have shape $(8,256,32768)$. The conceptual attention score shape is $(8,8,256,256)$, although the backend may compute it without retaining that full tensor. During a single-request decode, only the newly appended position flows through the blocks, while the stored K/V sequence grows.
+
+\subsection{Initialization and optimizer details}
+All linear and embedding weights begin with a zero-mean normal distribution of standard deviation 0.02, linear biases with zero, and LayerNorm gain/bias with one/zero. Each of the $2L$ residual-branch output matrices receives standard deviation $0.02/\sqrt{2L}$ (0.005 for eight blocks). This follows the motivation of controlling accumulation along deep residual routes; it is not a demonstrated initialization ablation in this project.
+
+To reproduce the RoPE research initialization, the native constructor first initializes the classic graph and then removes the unused learned-position table. Otherwise, consuming fewer random numbers early in construction would change later shared tensors, confounding a nominally position-only comparison. The initializer hash and equality check document this detail.
+
+Let $g_t$ be the accumulated gradient after global norm clipping,
+\begin{equation}
+g_t\leftarrow g_t\min\left(1,\frac{1}{\lVert g_t\rVert_2+\epsilon_c}\right).
+\end{equation}
+AdamW maintains exponentially weighted first and second moments,
+\begin{align}
+m_t&=\beta_1m_{t-1}+(1-\beta_1)g_t,&
+v_t&=\beta_2v_{t-1}+(1-\beta_2)g_t^2,\\
+\widehat m_t&=m_t/(1-\beta_1^t),&
+\widehat v_t&=v_t/(1-\beta_2^t),\\
+\theta_t&=(1-\eta_t\lambda)\theta_{t-1}-\eta_t\frac{\widehat m_t}{\sqrt{\widehat v_t}+\epsilon_a}.
+\end{align}
+Weight decay pulls eligible \emph{parameters}, not gradients, toward zero. In the code $\lambda=0.1$ for tensors with at least two dimensions and zero otherwise. The optimizer uses its standard epsilon; no special epsilon experiment was performed. Clipping protects against a large accumulated gradient, while the moments change the adaptive update. These are distinct mechanisms.
+
+For zero-based schedule index $s$, warmup uses $\eta_{\max}(s+1)/100$ for $s<100$. Thereafter, with $r=(s-100)/(3000-100)$ clipped to $[0,1]$,
+\begin{equation}
+\eta(s)=\eta_{\min}+\tfrac12(\eta_{\max}-\eta_{\min})[1+\cos(\pi r)].
+\end{equation}
+The last actual update approaches the minimum under this indexing. Training loss is divided by the accumulation count before each backward; clipping and optimizer stepping happen only after both microbatches.
+
+\subsection{Candidate definitions}
+The RMSNorm candidate replaces all 17 normalization sites with learned rescaling by $\sqrt{C^{-1}\sum_i x_i^2+10^{-5}}$, without centering or an additive bias. It explicitly evaluates the normalization on FP32 input before restoring the input dtype. It changes normalization, not token mixing. The tested SwiGLU candidate computes
+\begin{equation}
+\bigl[\mathrm{SiLU}(xW_g+b_g)\odot(xW_u+b_u)\bigr]W_d+b_d,
+\qquad \mathrm{SiLU}(z)=z\,\mathrm{sigmoid}(z),
+\end{equation}
+with gated width 1,024. Its roughly matched parameter count is not an identical computation budget; the measured timing and allocations remain necessary.
+
+GQA pools four adjacent K/V head projections into one while keeping queries unchanged. It reduces packed projection width from 1,152 to 576, saving 221,760 parameters per block (1,774,080 total). Those converted weights describe a different model and cannot be loaded into an ordinary MHA architecture under the old checkpoint interpretation.
+
+\section{Complete experiment register}
+\label{app:registry}
+\begin{table}[ht]
+\caption{Initial sequence (August 31, 2026). An accepted diagnostic is not an accepted generation model. All runs use real Manas tokens.}
+\centering\small
+\begin{tabularx}{\linewidth}{lXX}
+\toprule ID & Budget / configuration & Outcome \\
+\midrule
+E0 & Real batch $(4,64)$; 4.60M params & Shape, finite-gradient, round-trip, and bounded causal checks pass. \\
+E1a & Fixed batch, max 1,200 updates & Invalid evaluation summary: evaluator sampled another batch. Retained as a measurement failure. \\
+E1b & 2 layers, width 128, 4 heads; dropout 0; LR 0.001, no weight decay & Gate passed at 100 updates; 0.02673 fixed-batch loss; 100\% top-1. \\
+E2 & 4 layers, width 192, 4 heads; $T=128$, $B=16$; LR 0.0005 & 8.10M pilot overfits; best 200, stop 1,000; 105.1 s loop. \\
+E3 & 6 layers, width 256, 8 heads; $T=256$ & 13.19M full-epic baseline; 3,000 updates, best 2,800. \\
+E4 & E3 with $T=512$, $B=4$ instead of 8 & Same targets/update, worse prediction and lower throughput. \\
+E5 & 8 layers, width 384, 8 heads; $T=256$ & 26.88M classic model accepted; best 2,900/3,000. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[ht]
+\caption{Optimization register (September 4, 2026). This accounts for measured failures, completed comparisons, and intentionally unrun work.}
+\centering\small
+\begin{tabularx}{\linewidth}{lXX}
+\toprule ID & Changed path / budget & Final interpretation \\
+\midrule
+O00 & Frozen source, weights, data; copying audit repair & Preserve original evidence; recompute matcher on saved generations. \\
+O01 & Last-position output projection; no training & Adopt after parity and contextual timing checks. \\
+O02 & 100-update precision probe; 3,000 + 3,000 full pair & BF16 training accepted; inference remains FP32. \\
+O03 & Three compiler attempts; corrected 35-update pair & First gradients invalid; corrected path slower; no full training. \\
+O04 & Checkpoint RNG failure, correction, 35-update pair & Optional memory-saving path; disabled for current recipe. \\
+O05 & 32k/16k/8k, 30 text passes each & All complete; retain incumbent tokenizer and recipe. \\
+O06 & Initial RoPE numerical/cost probe & Speed rejection superseded by O13 quality result. \\
+O07 & Initial RMSNorm numerical/cost probe & Reopened; no full-budget superiority claim. \\
+O08 & Parameter-matched SwiGLU; 3,000 updates & Worse prediction and repetition; retain GELU. \\
+O09 & Request-local cache, prefill/decode; no training & Adopt; disclose near-overflow loss of speed benefit. \\
+O10 & Pooled 2-KV GQA versus MHA; 150 updates each & Cache saving passes; prediction gate fails; retain MHA. \\
+O11 & Conditional output-loss optimization & Assessed, not triggered; no new kernel or benchmark. \\
+O12 & Export, integrity and bounded generation checks & Original optimized release identified and preserved. \\
+O13 & 100-update control calibration; RoPE 3,000, RMSNorm 900 & RoPE adopted; RMSNorm budget-stopped; current native export verified. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Staged quality rules and retained uncertainty}
+\label{app:stopping}
+For scheduled validation delta $\delta_s=\mathcal{L}_{\mathrm{candidate},s}-\mathcal{L}_{\mathrm{control},s}$, I compared a recent three-check mean with the preceding three-check mean. Let their difference, previous minus recent, be the improvement in the candidate's relative gap. Lower deltas favor the candidate. At updates 600, 900, 1,200, and 1,500:
+\begin{enumerate}
+\item No quality pruning is allowed before 600.
+\item Stop a clearly worse candidate if its recent mean exceeds $+0.05$, all three recent deltas exceed $+0.03$, and relative-gap improvement is below 0.01 nats.
+\item From update 900 onward, stop for insufficient practical gain if the recent mean exceeds $-0.02$ and relative-gap improvement is below 0.01.
+\item At update 1,500, require recent mean $\leq-0.02$ and all three recent deltas negative before spending the remaining full-run budget.
+\item A full candidate still needs an additional 100-batch evaluation at least 0.02 nats better than the accepted control, plus raw-output review and native-path verification before promotion.
+\end{enumerate}
+
+\begin{table}[ht]
+\caption{Actual followup gates. RMSNorm stops at the first eligible insufficient-gain checkpoint; no later values are inferred.}
+\centering\small
+\begin{tabular}{lrrl}
+\toprule Candidate & Update & Recent mean delta & Action \\
+\midrule
+RoPE & 600 & $-0.34082$ & Continue \\
+RoPE & 900 & $-0.38106$ & Continue \\
+RoPE & 1,200 & $-0.38530$ & Continue \\
+RoPE & 1,500 & $-0.35025$ & Complete 3,000 updates \\
+RMSNorm & 900 & $+0.00331$ & Stop; final quality unknown \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The resumed driver preserves weights, optimizer state, CPU/MPS RNG states, training progress, and the original full schedule. Interruptions do not reset a model and relabel it as the same run. The SwiGLU experiment was likewise completed after an explicitly recorded pause; its final result is not a partial run.
+
+This procedure conserves compute but does not solve sequential-selection bias. The effect floor and patience logic express a practical budget choice. Neither a three-check average nor calibration against one archived control estimates between-seed variability. A later multi-seed study should treat the resulting architecture as a selected hypothesis and evaluate it on fresh, predeclared data.
+
+\section{Generation audit protocol and examples of failure}
+\label{app:audit}
+The fixed prompts are {\kyrgyz Манас}, {\kyrgyz Айкөл Манас}, {\kyrgyz Бакай}, {\kyrgyz — Кана, баатыр}, and {\kyrgyz Кылычын сууруп}. Each is paired with seeds 1337, 2026, 3407, and 6036, in that order. Audits exclude the supplied prompt from continuation statistics. A repeated-trigram ratio counts repeated word-trigram occurrences beyond their first occurrence, divided by the total number of word trigrams; it is not a semantic repetition detector.
+
+For the current RoPE model, mean repeated trigrams are 4.134\%, and the largest ratio is 19.018\% (sample 7). Sample 6 has no exact repeated trigrams but still lacks a reliable narrative progression. Sample 10 has a longest normalized training-word match of eleven words. Across the batch, recurring defects include actor changes, repeated hero/companion formulas, malformed morphology, and unstable dialogue attribution. The saved complete texts, not a few selected attractive fragments, were the basis of the recorded review.
+
+The public paper snapshot contains per-sample prompt, seed, and repetition measurements, but does not republish the complete generated continuations or licensed source passages. The local generation-audit artifact has a SHA-256 recorded in the evidence snapshot. This deliberately avoids presenting a selected fluent excerpt as a representative quality score. There is no annotation panel, inter-rater agreement, blind preference study, toxicity benchmark, or factuality evaluation to report.
+
+\section{Provenance and reproduction}
+\label{app:provenance}
+\subsection{Immutable inputs and selected output}
+\begin{table}[ht]
+\caption{Key identities. Full digests are provided below and in the machine-readable paper snapshot.}
+\centering\small
+\begin{tabularx}{\linewidth}{lX}
+\toprule Artifact & Identity \\
+\midrule
+Source archive & \code{kyrgyz\_2022\_10\_03.zip}; VRT member of the same stem; document \code{Manas01} \\
+Frozen tokenizer & \code{kyrgyz-byte-bpe-v1/tokenizer.json}; commit \code{594d9e142cca1593963ccf12f344ab7ea4938fa5} \\
+Current model source & \code{437195fb1a109e3ff392aaae7c4c350518b9df76} \\
+Current config & \code{configs/manas01-27m-rope.toml} \\
+Selected research checkpoint & O13 RoPE, best update 2,900 \\
+Inference export & \code{tiny-manas-27m-rope-20260904.pt}; 107,157,586 bytes \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{Archive SHA-1}\par
+\nolinkurl{82fc72b9687175c55b5309822da2a7c44bb303f1}
+
+\noindent\textbf{Tokenizer SHA-256}\par
+\nolinkurl{5047b4f427bb1af1c06cfb9cefbe83790b56df409b137b887988db6eba4b159f}
+
+\noindent\textbf{Selected research checkpoint SHA-256}\par
+\nolinkurl{c43e76c6307ce345da3983e04132b95291270c07bb7c38763c48b3ef394b6473}
+
+\noindent\textbf{Inference export SHA-256}\par
+\nolinkurl{abc13354d5cb1cc94c966985d95252befdfaf9f25b19c1884701442f4e519d8f}
+
+The tokenizer corpus build is recorded at revision \code{46e4e4fc0b225917941139d0a067987bef5f4496}. Its source locks include Wikipedia dump 20260801, Kyrgyz News Corpus revision \code{a7e5ac9c28b86f07c1ad4db1d9c095deb03e46c9}, FineWeb2 revision \code{af9c13333eb981300149d5ca60a8e9d659b276b9}, and the Manas archive above. Consult the \href{https://github.com/nik1t7n/kyrgyz-tokenizer/blob/594d9e142cca1593963ccf12f344ab7ea4938fa5/docs/reports/CORPUS_V1_BUILD_REPORT.md}{pinned tokenizer corpus build report} for source attribution, selection, deduplication, and shard digests. These upstream identifiers are provenance, not a promise that an upstream download will remain available indefinitely.
+
+\subsection{Where each claim can be audited}
+The original capacity results are retained in \code{reports/results.json} and \code{RESULTS.md}. Their raw run directories are \code{manas01-base-20260831T152803Z}, \code{manas01-context512-20260831T154720Z}, and \code{manas01-27m-20260831T160739Z}. E1 and E2 use \code{overfit-one-batch-20260831T152234Z} and \code{pilot-10k-20260831T152349Z}; the invalid E1 attempt ends in \code{152055Z}.
+
+O01--O13 reports live under \code{docs/experiments/}. The principal full comparison artifacts are the O02 \code{comparison.json}, O05 per-vocabulary \code{result.json}, O08 \code{result.json}, and O13 RoPE/RMSNorm histories and decision files. Their local paths and file hashes are enumerated by \code{docs/paper/data/evidence.json}. It is a small extracted snapshot, not a replacement for raw run data. Saved status strings such as ``completed\_not\_promoted'' describe a runner's state at output time; the subsequent native promotion record and \code{accepted-state.json} determine the final adopted model.
+
+The paper's plots are regenerated from extracted CSVs, not traced from screenshots. The extractor reads existing JSON/JSONL artifacts and performs no training, sampling, or server calls. Full licensed corpus files, token arrays, and checkpoints remain outside Git. Rebuilding the public PDF requires only the tracked paper sources, data snapshot, fonts, and a LaTeX toolchain; rerunning training additionally requires the pinned real inputs and a supported MPS host. No CPU fallback is used to impersonate the training backend.
+
+\subsection{Reproduction entry points and reporting checklist}
+The native command-line interface exposes preparation, training, evaluation, generation, and export. Use the current RoPE configuration for the accepted architecture and the historical configs/runners for historical comparisons; running the current default is not a reproduction of every row in this report. The experiment reports contain the exact scoped commands and immutable input requirements.
+
+\begin{itemize}
+\item Data selection, preprocessing, tokenizer identity, and split boundaries: Section~\ref{sec:data} and the pinned manifests.
+\item Architecture, parameter count, objective, initialization, optimizer, and precision: Sections~\ref{sec:model}--\ref{sec:protocol} and Appendix~\ref{app:math}.
+\item Candidate budgets, negative results, and unrun cases: Appendix~\ref{app:registry}; stopping rules: Appendix~\ref{app:stopping}.
+\item Validation selection versus post-selection test, overlapping windows, single seed, and absence of confidence intervals: Section~\ref{sec:metrics}.
+\item Timing denominator, memory-sampling definition, output audit, and known deployment limits: Sections~\ref{sec:systems} and \ref{sec:inference}.
+\item Licensing, dataset exposure, qualitative uncertainty, AI assistance, and limits on claims: Sections~\ref{sec:data} and \ref{sec:discussion}, and the authorship note.
+\end{itemize}
+
+\paragraph{Document preparation.}
+I inspected the original PDFs of the Transformer, GPT-2, and Dropout papers, including their architecture diagrams, experiment tables, captions, and appendices. This independent report uses the official \href{https://neurips.cc/Conferences/2026/CallForPapers}{NeurIPS 2026} \emph{preprint} style, not its accepted-paper option, with original vector figures, embedded fonts, numbered equations, and explicit limitations. It is longer than the conference's nine-page main-paper limit and is not represented as a NeurIPS submission. The reproducible TeX and figures follow \href{https://info.arxiv.org/help/submit_tex.html}{arXiv's source-preparation guidance}; the report has not been submitted to or endorsed by arXiv. Formatting is not peer review.
+
+\end{document}
