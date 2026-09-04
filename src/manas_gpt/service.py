@@ -19,7 +19,7 @@ from .experiment import load_checkpoint
 from .model import ManasGPT
 
 
-ACCEPTED_CHECKPOINT_SHA256 = "cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1"
+ACCEPTED_CHECKPOINT_SHA256 = "4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494"
 
 
 @dataclass(frozen=True)
@@ -164,6 +164,8 @@ def health() -> dict[str, Any]:
         "parameters": model.parameter_count(),
         "context": model.config.block_size,
         "checkpoint_step": runtime["checkpoint_step"],
+        "checkpoint_sha256": runtime["settings"].checkpoint_sha256,
+        "kv_cache": True,
     }
 
 
