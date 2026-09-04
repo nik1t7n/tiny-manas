@@ -61,6 +61,7 @@ class TrainingConfig:
     early_stop_patience: int
     target_train_loss: float
     precision: str = "fp32"
+    activation_checkpointing: bool = False
 
 
 @dataclass(frozen=True)
@@ -143,6 +144,8 @@ def validate_config(config: ExperimentConfig) -> None:
         raise ValueError("model.dropout must be in [0, 1)")
 
     training = config.training
+    if not isinstance(training.activation_checkpointing, bool):
+        raise ValueError("training.activation_checkpointing must be a boolean")
     if training.precision not in {"fp32", "bf16"}:
         raise ValueError("training.precision must be 'fp32' or 'bf16'")
     positive_ints = {

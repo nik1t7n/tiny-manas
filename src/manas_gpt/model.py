@@ -9,6 +9,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .config import ModelConfig
+from .checkpointing import checkpoint_block
 
 
 class CausalSelfAttention(nn.Module):
@@ -75,6 +76,7 @@ class ManasGPT(nn.Module):
         if config.vocab_size < 1:
             raise ValueError("ModelConfig.vocab_size must be set before model construction")
         self.config = config
+        self.activation_checkpointing = False
         self.token_embedding = nn.Embedding(config.vocab_size, config.n_embd)
         self.position_embedding = nn.Embedding(config.block_size, config.n_embd)
         self.embedding_dropout = nn.Dropout(config.dropout)
@@ -117,7 +119,10 @@ class ManasGPT(nn.Module):
         x = self.token_embedding(token_ids) + self.position_embedding(positions)[None, :, :]
         x = self.embedding_dropout(x)
         for block in self.blocks:
-            x = block(x)
+            if self.activation_checkpointing and self.training and torch.is_grad_enabled():
+                x = checkpoint_block(block, x)
+            else:
+                x = block(x)
         x = self.final_norm(x)
         logits = self.lm_head(x[:, -1:, :] if last_position_only else x)
         loss = None

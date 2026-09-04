@@ -105,6 +105,16 @@ no recompilation after warmup, no positive amortization. Preserve all three
 attempts and their diagnosis; do not change the production position expression
 or enable compile. Next: ordinary-versus-checkpointed dropout-gradient check.
 
+**O04 result:** standard checkpointing failed the real dropout-enabled gradient
+check (relative error 0.675827, MPS RNG advanced). Explicit paired MPS RNG contexts
+fixed the defect: gradient error ~6e-9, identical loss and preserved random state.
+Over 35 real updates per mode, sampled allocation fell 38.46% while median update
+latency rose 30.63%. Accept as opt-in, leave it off for our already-fitting model.
+Integrated the shared helper/model/config path and reran the one-batch gate;
+it passed. Original checkpoint keys/weights and ordinary inference remain intact.
+Next: implement the equal-text tokenizer training/evaluation driver over the
+already verified immutable inputs, then run the preregistered comparison.
+
 **O05 promotion-gate correction before execution:** the fresh 32k run controls
 the tokenizer comparison but could itself underperform our incumbent because
 the equal-text sampler is new. Added exact-byte evaluation of the incumbent as

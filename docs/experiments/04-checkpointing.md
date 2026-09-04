@@ -1,6 +1,6 @@
 # 04 — Activation checkpointing without changing the training computation
 
-Status: preregistered, **not run**. Execute after the precision/compile decisions.
+Status: **accepted as an opt-in MPS memory mode; off by default**.
 Date: 2026-09-04.
 
 ## Question and forecast
@@ -88,3 +88,59 @@ restrictions and early-stop recomputation. Local source checked:
 `torch/utils/checkpoint.py` (`_infer_device_type`, `get_device_states`,
 `_checkpoint_without_reentrant_generator`) and `torch/mps/__init__.py`.
 Recheck the runtime behavior on this installation before claiming support.
+
+## Observed failure and explicit repair
+
+Standard run: `runs/optimization-04-checkpointing-20260904T062615Z`.
+The suspected MPS RNG problem reproduced on the actual BF16-trained checkpoint
+with dropout 0.2. Forward loss matched exactly, but relative gradient L2 was
+0.675827 and the first updated parameter differed by up to 0.00006008. CPU RNG
+matched; MPS RNG did not, and checkpoint backward advanced it. The run stopped
+before throughput timing. This demonstrates why loss-only or eval-only checks
+would have missed the defect.
+
+Corrected run: `runs/optimization-04-checkpointing-20260904T062736Z`, using
+`--preserve-mps-rng`. A forward context captures the public MPS RNG state for
+each block; the recompute context temporarily restores that state and restores
+the outer state on exit, including early-stop exceptions. CPU preservation
+remains handled by standard non-reentrant checkpointing. No private device
+flags, disabled dropout, manually adjusted gradients or alternate device path.
+
+Correctness passed: loss difference 0, relative gradient L2 6.03e-9, maximum
+post-update parameter difference 7.45e-9, matching CPU/MPS states. Both modes
+then completed 35 real updates with two microbatches per update. Maximum loss
+difference across those updates was 0.0004758; do not claim bitwise-identical
+long training trajectories from the first-batch check.
+
+## Measurements and promotion
+
+The first five updates per mode are excluded from these statistics. The same
+checkpoint, real windows, seed, BF16 precision, dropout and optimizer were used.
+
+| Measurement | Ordinary | Checkpointed with MPS RNG preservation |
+|---|---:|---:|
+| Median update seconds | 0.317603 | 0.414878 |
+| Maximum sampled allocated bytes | 2,099,575,552 | 1,292,135,680 |
+| Maximum sampled driver bytes | 3,560,751,104 | 2,487,009,280 |
+
+Allocated-memory samples fell 38.46%; update latency rose 30.63%. This passes
+the >=15% saving / <=50% overhead gate. These are whole live PyTorch allocation
+samples including parameters and optimizer state, **not** an isolated activation
+measurement or an exact device/process peak. Modes ran sequentially, so shared
+host load remains a limitation.
+
+**Decision:** integrate an explicit `training.activation_checkpointing` option,
+default `false`. The current 27M model already fits; making this slower path the
+default would hurt the speed-first experiment sequence. Setting it to `true`
+enables block checkpointing during gradient-enabled training only. Evaluation
+and generation use the ordinary path. Architecture and checkpoint tensor keys
+are unchanged. This implementation is explicitly validated for MPS, not claimed
+as a cross-device or compiled checkpointing solution.
+
+The shared implementation is `src/manas_gpt/checkpointing.py`, called by the
+model's real block loop. After integration, the same real-checkpoint smoke with
+`--preserve-mps-rng --verify-only` passed in
+`runs/optimization-04-checkpointing-20260904T062903Z`: relative gradient error
+5.96e-9, update maximum difference 7.45e-9, identical loss and preserved RNG.
+Reuse the fresh 35-update benchmark; the integration moved the same mechanism
+out of the research wrapper rather than changing its computation.

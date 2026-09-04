@@ -33,6 +33,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--precision", choices=("fp32", "bf16"), required=True)
+    parser.add_argument("--preserve-mps-rng", action="store_true",
+                        help="Explicitly restore MPS dropout RNG during recomputation")
+    parser.add_argument("--verify-only", action="store_true", help="Run only the real-batch correctness gate")
     args = parser.parse_args()
     source = args.checkpoint.resolve(strict=True)
     out = ROOT / "runs" / ("optimization-04-checkpointing-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
@@ -45,7 +48,8 @@ def main():
     report = {"status": "running", "environment": environment_info(device),
               "checkpoint": str(source), "checkpoint_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
               "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-              "precision": args.precision, "execution": "eager", "rng_preservation": "standard_pytorch",
+              "precision": args.precision, "execution": "eager",
+              "rng_preservation": "explicit_mps_context" if args.preserve_mps_rng else "standard_pytorch",
               "memory_kind": "samples after forward/backward/update; not exact peaks", "modes": {}}
 
     def save():
@@ -55,7 +59,10 @@ def main():
         model, payload = load_checkpoint(source, device)
         del payload
         if mode == "checkpointed":
-            model.blocks = nn.ModuleList(CheckpointBlock(block) for block in model.blocks)
+            if args.preserve_mps_rng:
+                model.activation_checkpointing = True
+            else:
+                model.blocks = nn.ModuleList(CheckpointBlock(block) for block in model.blocks)
         model.train()
         optimizer = model.configure_optimizer(0.00003, 0.1, (0.9, 0.95))
         return model, optimizer
@@ -102,6 +109,11 @@ def main():
             raise RuntimeError(f"Checkpoint correctness gate failed: {report['parity']}")
         del base, candidate, evidence
         gc.collect()
+        if args.verify_only:
+            report["status"] = "correctness_verified_not_benchmarked"
+            save()
+            print(json.dumps({"run": str(out), "parity": report["parity"]}), flush=True)
+            return
         for mode in ("ordinary", "checkpointed"):
             model, optimizer = load(mode)
             sampler = RandomWindowSampler(train, 8, 256, 1338)

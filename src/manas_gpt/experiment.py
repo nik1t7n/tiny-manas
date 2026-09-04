@@ -241,6 +241,7 @@ def train(config_path: str | Path) -> dict[str, Any]:
     vocab_size = int(metadata["tokenizer"]["vocab_size"])
     model_config = config.model.with_vocab_size(vocab_size)
     model = ManasGPT(model_config).to(device)
+    model.activation_checkpointing = config.training.activation_checkpointing
     autocast = (
         lambda: torch.autocast("mps", dtype=torch.bfloat16)
     ) if config.training.precision == "bf16" else nullcontext
