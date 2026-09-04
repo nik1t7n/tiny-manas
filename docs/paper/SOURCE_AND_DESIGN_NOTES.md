@@ -55,7 +55,7 @@ hashed in `data/evidence.json`.
    `model.py`, `rotary.py`, and the accepted configuration.
 2. Pilot and full-corpus learning curves: raw scheduled metrics; no smoothing.
 3. Equal-byte tokenizer trajectories: same original target bytes and explicit
-   separate incumbent score, not a invented incumbent training curve.
+   separate incumbent score, not an invented incumbent training curve.
 4. RoPE/RMSNorm deltas: actual checkpoints against the calibrated historical
    BF16 control; no extrapolated RMSNorm tail or fake uncertainty bands.
 5. Prefill/decode/overflow: declared cache contract, including explicit rebuild.

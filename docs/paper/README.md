@@ -21,6 +21,7 @@ conference's nine-page submission limit.
 - `make_figures.py`: deterministic ReportLab vector-figure builder.
 - `SOURCE_AND_DESIGN_NOTES.md`: primary literature and layout decisions.
 - `WORK_PLAN.md`: scope and delivery checklist.
+- `EDITORIAL_REVIEW.md`: detailed presentation review, corrections, and limits.
 
 ## Build the PDF
 

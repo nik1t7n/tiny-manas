@@ -35,7 +35,12 @@ def text(c, x, y, s, size=8, bold=False, color=INK, align="left"):
 
 def line(c, points, color=INK, width=1, dashed=False):
     c.setStrokeColor(HexColor(color)); c.setLineWidth(width)
-    c.setDash(3, 2) if dashed else c.setDash()
+    if isinstance(dashed, tuple):
+        c.setDash(*dashed)
+    elif dashed:
+        c.setDash(3, 2)
+    else:
+        c.setDash()
     p = c.beginPath(); p.moveTo(*points[0])
     for x, y in points[1:]: p.lineTo(x, y)
     c.drawPath(p)
@@ -154,26 +159,26 @@ def curves():
     text(c,35,223,"(a) 10k-token pilot",9,True)
     d=rows("pilot.csv");series(c,d,"step","train",pt,TEAL);series(c,d,"step","validation",pt,RUST)
     legend(c,48,174,[("Train",TEAL,False),("Validation",RUST,False)])
-    pt=axes(c,233,42,153,151,100,3000,3.8,8.2,[100,1500,3000],[4,5,6,7,8],"Updates","Validation loss")
+    pt=axes(c,233,42,153,151,100,3000,3.8,8.2,[100,1500,3000],[4,5,6,7,8],"Updates","Validation loss (nats/token)")
     text(c,233,223,"(b) Full Manas01",9,True)
-    for name,col,dash in [("base13",GREY,False),("context512",RUST,True),("classic27",BLUE,False),("rope",TEAL,False)]:
+    for name,col,dash in [("base13",GREY,(1,2)),("context512",RUST,True),("classic27",BLUE,(6,2)),("rope",TEAL,False)]:
         series(c,rows(name+".csv"),"step","validation",pt,col,dash)
-    legend(c,277,181,[("13M / 256",GREY,False),("13M / 512",RUST,True),("27M / learned",BLUE,False),("27M / RoPE",TEAL,False)])
+    legend(c,277,181,[("13M / 256",GREY,(1,2)),("13M / 512",RUST,True),("27M / learned",BLUE,(6,2)),("27M / RoPE",TEAL,False)])
     c.save()
     c=new("staged-quality.pdf",396,220)
-    pt=axes(c,40,44,342,139,100,3000,-.45,.025,[100,600,900,1500,3000],[-.4,-.3,-.2,-.1,0],"Optimizer updates","Validation loss difference from matched BF16 control")
+    pt=axes(c,40,44,342,139,100,3000,-.45,.025,[100,600,900,1500,3000],[-.4,-.3,-.2,-.1,0],"Optimizer updates","Validation loss difference (nats/token; candidate minus control)")
     line(c,[pt(100,-.02),pt(3000,-.02)],GREY,.8,True)
     series(c,rows("rope-delta.csv"),"step","delta",pt,TEAL)
     series(c,rows("rmsnorm-delta.csv"),"step","delta",pt,RUST,True)
-    legend(c,216,135,[("RoPE: completed 3,000",TEAL,False),("RMSNorm: stopped at 900",RUST,True),("Practical gain floor: –0.02",GREY,True)])
+    legend(c,216,135,[("RoPE: completed 3,000",TEAL,False),("RMSNorm: stopped at 900",RUST,True),("Practical gain floor: −0.02",GREY,True)])
     text(c,40,203,"Lower is better; repeated checks are not independent seeds",8,True)
     c.save()
     c=new("tokenizer-curves.pdf",396,205)
     pt=axes(c,40,40,342,125,1,30,.85,1.55,[1,10,20,30],[.9,1.1,1.3,1.5],"Complete training-text passes","Validation bits per byte")
-    for name,col,dash in [(32768,BLUE,False),(16384,RUST,True),(8192,TEAL,False)]:
+    for name,col,dash in [(32768,BLUE,(6,2)),(16384,RUST,True),(8192,TEAL,False)]:
         series(c,rows(f"vocab{name}.csv"),"epoch","bpb",pt,col,dash)
-    line(c,[pt(1,.8764423051),pt(30,.8764423051)],GREY,1,True)
-    legend(c,208,148,[("32k / equal-text recipe",BLUE,False),("16k / equal-text recipe",RUST,True),("8k / equal-text recipe",TEAL,False),("Incumbent / random windows",GREY,True)])
+    line(c,[pt(1,.8764423051),pt(30,.8764423051)],GREY,1,(1,2))
+    legend(c,208,148,[("32k / equal-text recipe",BLUE,(6,2)),("16k / equal-text recipe",RUST,True),("8k / equal-text recipe",TEAL,False),("Incumbent / random windows",GREY,(1,2))])
     text(c,40,187,"Same target bytes; different token boundaries",8,True)
     c.save()
 
