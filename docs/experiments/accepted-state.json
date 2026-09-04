@@ -14,5 +14,6 @@
   "test_evaluated_during_selection": false,
   "deployed": false,
   "original_checkpoint_preserved": true,
-  "next_experiment": "03-compile"
+  "rejected_experiments": ["03-compile"],
+  "next_experiment": "04-checkpointing"
 }

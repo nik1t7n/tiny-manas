@@ -1,6 +1,6 @@
 # 03 — Compile the real training path on MPS
 
-Status: preregistered, **not run**. Wait for experiment 02's precision decision.
+Status: **rejected for this MPS workload** after correctness diagnosis and timing.
 Date: 2026-09-04.
 
 ## Question, rationale and forecast
@@ -66,3 +66,58 @@ set to the decision from experiment 02. Do not run while its paired training is 
   `torch/_inductor/codegen/common.py` registers MPS with `MetalScheduling`;
   `torch/_inductor/codegen/mps.py` contains the prototype warning and BF16 type mapping.
 - CUDA graph modes are not assumed applicable to this MPS workload.
+
+## Execution, failure and bounded diagnosis
+
+All attempts used the accepted BF16-trained checkpoint (SHA-256
+`31499eb747c98bcada1c48b12205033cded96573269bc15464ccafd9905e2167`), BF16 training
+autocast, original B=8,T=256 and MPS. Each attempt had an external 600-second
+process-group wall budget; none reached it. No eager substitution occurred.
+
+1. `runs/optimization-03-compile-20260904T062220Z`: loss difference 0.0001981,
+   maximum logit difference 0.125, but relative gradient L2 1.33376. Stopped before
+   optimizer timing, as preregistered.
+2. `runs/optimization-03-compile-20260904T062329Z`: replaced positional
+   concatenation of gradients in the measurement with explicit parameter-name
+   alignment and per-parameter diagnostics. Parameter name order also matched,
+   so ordering was not the cause. Relative gradient error remained 1.32557.
+   The positional embedding gradient norm was 3.53353 compiled versus 0.441809
+   eager, approximately 8x (the batch size). Its relative error was 6.99791;
+   most other leading differences were around 0.4–0.7%.
+3. `runs/optimization-03-compile-20260904T062518Z`: an explicit research-only
+   candidate indexes positions with shape `(B,T)` before embedding lookup, rather
+   than broadcasting a `(1,T,C)` lookup result over the batch. It uses the same
+   position values and trainable weights; no gradients are manually divided or
+   overridden. Relative gradient error fell to 0.00651084 and loss difference
+   stayed 0.0001981, both inside the BF16 0.02 gate. Argmax agreement was
+   99.7070%. This isolates an observed broadcast-path problem on this installed
+   backend; it is not a claim to have diagnosed every underlying compiler kernel.
+
+The third run used `--explicit-position-lookup`; the candidate is retained only
+in the research runner. Main model code and trained weights are unchanged.
+The [PyTorch compiler troubleshooting guide](https://docs.pytorch.org/docs/2.13/user_guide/torch_compiler/torch.compiler_faq.html)
+supports component isolation; the observed numerical results above are local
+experimental evidence, not a documented universal PyTorch limitation.
+
+## Timing and decision
+
+With the corrected candidate, all 35 paired dropout-enabled updates per arm
+completed. Counters were unchanged between the end of warmup and the final
+measurement; recurring compilation did not explain the result.
+
+| Measurement | Eager reference | Compiled candidate |
+|---|---:|---:|
+| Eval forward/backward, including cold compile | 0.51992 s | 5.94265 s |
+| First training update, including training graph compile | 0.51643 s | 5.77832 s |
+| Median update, 30 post-warmup pairs | 0.323650 s | 0.333425 s |
+
+Compiled update latency was 3.02% higher, throughput ratio 0.97068x. There is no
+positive break-even point because warmed steps save no time. This fails the
+predeclared >=5% useful-speed gate. **Do not promote compilation or its candidate
+position-lookup rewrite.** No full compiled training run is warranted by this
+result. BF16 eager remains accepted.
+
+Limitations: one local host/backend/version, one batch/context, a short warmed
+benchmark and one equivalent expression rewrite. Other hardware, versions or
+larger workloads may differ. This result does not show kernel fusion is useless
+in general; it shows this tested route did not improve Tiny Manas here.

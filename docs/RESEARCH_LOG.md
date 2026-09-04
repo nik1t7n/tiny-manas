@@ -96,6 +96,15 @@ Accept training autocast BF16, keep parameters/AdamW/evaluation/inference FP32,
 preserve original weights. Explicit selected checkpoint/hash and current settings
 are in [accepted state](experiments/accepted-state.json). Next: compile probe.
 
+**O03 result:** rejected. Original compiled path had relative gradient error
+1.33376 despite matching loss. Named diagnostics localized the dominant mismatch
+to an approximately 8x positional-table gradient. An equivalent batched lookup
+research candidate passed the BF16 gradient gate (0.00651084), then completed
+35 paired real updates. Median 0.333425 s compiled versus 0.323650 s eager;
+no recompilation after warmup, no positive amortization. Preserve all three
+attempts and their diagnosis; do not change the production position expression
+or enable compile. Next: ordinary-versus-checkpointed dropout-gradient check.
+
 **O05 promotion-gate correction before execution:** the fresh 32k run controls
 the tokenizer comparison but could itself underperform our incumbent because
 the equal-text sampler is new. Added exact-byte evaluation of the incumbent as
