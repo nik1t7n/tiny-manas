@@ -1,6 +1,6 @@
 # 08 — A budget-matched SwiGLU feed-forward network
 
-Status: **correctness/cost gate passed; full quality run in progress**. Date: 2026-09-04.
+Status: **completed; rejected after the full quality run**. Date: 2026-09-04.
 The setup below is the preregistered plan; measured results follow it.
 
 Prepared candidate: `scripts/architecture_candidates.py::with_swiglu`. It copies
@@ -10,14 +10,14 @@ identical. The training RNG must be reset after construction in both arms. Input
 projection weights use std .02, output weights use .02/sqrt(2L), and biases start
 at zero. The candidate rejects widths that cannot preserve the exact matrix
 budget rather than rounding without disclosure. No candidate training or MPS
-probe has run; source preparation is not an acceptance result.
+probe had run at preregistration; measured execution and decision follow below.
 
 Prepared execution: `scripts/experiment_architecture_probe.py --change swiglu`
 checks the explicit formula on actual post-attention features, the exact matrix
 budget, initialization scales and zero biases. The first real update must give
 nonzero gradients to all three projections. The shared 35-update comparison
 excludes five warmup updates; a passed cost gate is followed by the complete
-matched training run, not treated as a quality result. Only CLI parsing has run.
+matched training run, not treated as a quality result. At preparation time only CLI parsing had run.
 
 ## Question and forecast
 
@@ -107,6 +107,49 @@ validation batches, seed 1837, FP32: it must improve on 4.3457791471 by at least
 inspect it, then resume the same run to all 3,000 updates.
 
 ## Active full run and recovery
+
+**Final decision: reject SwiGLU for this recipe.** The full run and all 20 raw
+generations completed after the owner-authorized resume. Historical recovery
+notes below describe the earlier partial state, not unfinished training.
+
+| Metric | Accepted GELU | SwiGLU |
+|---|---:|---:|
+| Parameters | 26,877,696 | 26,881,792 |
+| Independent validation loss, 100 seed-1837 batches | 4.3457791471 | 4.4274226356 |
+| Same-byte validation BPB | 0.8764423051 | 0.8969851760 |
+| Mean repeated trigram ratio, 20 outputs | 0.0409728684 | 0.0695339416 |
+| Worst repeated trigram ratio | 0.3111111111 | 0.5277777778 |
+| Longest normalized copied word span | 9 | 7 |
+
+SwiGLU exceeded the independent loss ceiling 4.3257791471 by 0.1016434885
+nats and worsened the incumbent by 0.0816434884. Its scheduled 30-batch best
+was segment 29 (step 2,900), loss 4.3216637452; that smaller selection sample
+must not replace the independent acceptance evaluation. Both models completed
+the same 3,000-update training budget. The cost probe had already measured
+3.80% slower updates and 8.82% more sampled allocation.
+
+Final checkpoint SHA-256:
+`b41b6c0e9f263cd98b6e09d495b0c416310422743fed1814c1bad552fbc7dad3`.
+Evidence: `runs/optimization-08-swiglu-full-20260904/result.json`,
+`history.json`, `generation-audit.json`; probe path remains recorded above.
+
+### Reading the raw continuations
+
+All 20 complete texts were inspected. Sample 2 collapses into repeated choro
+phrases; 12 develops a related enumeration loop. Sample 3 repeats Syrgak and
+arrival/action phrases; 17 cycles through Kongurbay's title; 18 repeats weapon
+and combat descriptions; 20 degenerates into repeated Chubak names. Samples
+1, 5, 6, 7, 8, 9, 13, 14, 15, 16 and 19 retain epic motifs but recycle local
+phrases or lose entity continuity. Samples 4, 10 and 11 also contain malformed
+word forms and unstable narration; low exact-trigram repetition is insufficient
+evidence of coherent language. The seven-word maximum copying match does not
+offset the prediction loss or establish an absence of memorization elsewhere.
+
+The forecast that a learned gate might improve feature selection did not yield
+a useful gain under this initialization, dataset and fixed budget. No native
+SwiGLU integration, new accepted configuration or deployment of these weights
+is justified. Keep the isolated candidate for reproducibility and continue O09
+using the accepted O02 GELU/MHA checkpoint. Protected test remains unopened.
 
 Run: `runs/optimization-08-swiglu-full-20260904`. Its first real segment finished
 100 updates with finite metrics: training mean 8.371669, scheduled validation

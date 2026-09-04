@@ -4,6 +4,22 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 
 ## Optimization series — 2026-09-04
 
+**O08 completed after owner-authorized pause/resume:** all 3,000 updates finished;
+best scheduled checkpoint at 2,900. Independent 100-batch validation loss
+4.4274226356 versus GELU 4.3457791471; same-byte BPB 0.8969851760 versus
+0.8764423051. All 20 outputs read: mean repeated trigrams 6.95%, worst 52.78%,
+with choro/name/action loops. Reject SwiGLU despite its passed cost gate. See
+[08-swiglu.md](experiments/08-swiglu.md) for complete evidence and forecast update.
+
+**O09 executed on the accepted O02 weights:** cached/uncached logits and greedy
+choices matched across 20 real prompts, including context overflow; maximum
+absolute logit error 7.15e-6. Seeded sampling and request isolation passed.
+FP32 cache owns 6,291,456 bytes. Short 32-token prompt / 64-token generation:
+0.196746 to 0.170108 seconds (1.1566x); near-full 248-token prompt: only 1.0165x.
+Adopt the measured request-local cache, preserve explicit uncached generation,
+and report overflow rebuilds rather than changing context semantics. Native
+integration is checked through the existing generation path before proceeding.
+
 The owner authorized sequential implementation, individual experiment reports,
 measured promotion and an eventual updated README. The original revision
 `4ad408e` and 17 real artifact files were copied and SHA-256 verified before
