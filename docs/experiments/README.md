@@ -10,7 +10,7 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 ## Checklist
 
 - [x] 00 — Freeze original code, architecture, configs, data, tokenizer, checkpoint and evidence. See [baseline](00-baseline.md) and [verified manifest](00-baseline-manifest.json).
-- [ ] 01 — Last-position output projection during generation.
+- [x] 01 — Last-position output projection during generation. [Accepted](01-last-position.md): parity passed, 1.24x model-forward speed at B=1,T=256; 256x smaller output tensor.
 - [ ] 02 — BF16 mixed precision.
 - [ ] 03 — `torch.compile` and fusion on the winning precision mode.
 - [ ] 04 — Activation checkpointing, unchanged batch and context first.

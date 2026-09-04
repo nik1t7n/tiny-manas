@@ -17,6 +17,12 @@ real validation inputs with no test access. Synchronized interleaved warmed
 timings, numerical tolerance 1e-4, and greedy continuations gate acceptance.
 Run command: `.venv/bin/python scripts/experiment_last_position.py`.
 
+**O01 result:** accepted. At B=1,T=256 full/last median forward times were
+7.307/5.894 ms; output tensor 32 MiB/128 KiB. Full logits compared within 1e-4,
+20 greedy continuations matched, and seeded stochastic generation matched across
+the context boundary. T=1 was slightly slower and receives no savings. See the
+individual report for complete measurements and limits. Next: BF16 training probe.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31

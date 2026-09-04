@@ -103,7 +103,11 @@ class ManasGPT(nn.Module):
         self,
         token_ids: torch.Tensor,
         targets: torch.Tensor | None = None,
+        *,
+        last_position_only: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        if last_position_only and targets is not None:
+            raise ValueError("last_position_only cannot be used with training targets")
         batch, time = token_ids.shape
         if time > self.config.block_size:
             raise ValueError(
@@ -114,7 +118,8 @@ class ManasGPT(nn.Module):
         x = self.embedding_dropout(x)
         for block in self.blocks:
             x = block(x)
-        logits = self.lm_head(self.final_norm(x))
+        x = self.final_norm(x)
+        logits = self.lm_head(x[:, -1:, :] if last_position_only else x)
         loss = None
         if targets is not None:
             loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
@@ -133,7 +138,7 @@ class ManasGPT(nn.Module):
             raise ValueError("temperature must be positive")
         for _ in range(max_new_tokens):
             context = token_ids[:, -self.config.block_size :]
-            logits, _ = self(context)
+            logits, _ = self(context, last_position_only=True)
             next_logits = logits[:, -1, :] / temperature
             k = min(top_k, next_logits.size(-1))
             threshold = torch.topk(next_logits, k).values[:, [-1]]
