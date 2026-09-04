@@ -84,3 +84,7 @@ so an arXiv source package would need a separate portability/build check.
 Editing cannot establish broader scientific validity. Multi-seed comparisons,
 external baselines, a fresh held-out corpus, and human evaluation would require
 new research rather than wording changes.
+
+Subsequent author revision: removed the entire Acknowledgments and authorship
+note section. References now follow the conclusion. Numbered headings retain
+the template's punctuation: no period after the section number or heading.

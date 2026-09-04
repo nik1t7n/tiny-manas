@@ -413,9 +413,6 @@ Tiny Manas is unsuitable as a general assistant, a factual reference for the epi
 \section{Conclusion}
 I progressed from a fixed-batch learning check to a versioned 26.78M-parameter RoPE decoder that generates Manas-like text. The final model uses a frozen 32k tokenizer, BF16 training, and FP32 cached inference within a 256-token window. It reaches validation perplexity 61.30 and post-selection test perplexity 92.88 under the recorded protocol. Retained configurations and checkpoints link these results to their runs and selection rules. The gains remain specific to this experiment, with weak long-range coherence and substantial evaluation limitations. Broader data and human evaluation are needed before making stronger claims about language quality.
 
-\section*{Acknowledgments and authorship note}
-I acknowledge the Manas-UdS and other corpus maintainers, the researchers whose methods this implementation uses, and the educational value of Andrej Karpathy's nanoGPT. I used an AI coding assistant for implementation support, experiment operation, evidence collection, and preparation of this manuscript and its figures. Author responsibility and substantive claims remain with Nikita Nosov; this report does not represent independent peer review, conference acceptance, or a native-speaker evaluation.
-
 \begin{thebibliography}{13}
 \small
 \raggedright
