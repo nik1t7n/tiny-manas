@@ -16,6 +16,22 @@ temporary attention inputs are eight-headed. Account for these temporary
 allocations and timing instead of claiming a fourfold reduction in all attention
 memory or work. Native fused GQA is not assumed to exist on this MPS backend.
 
+Prepared runner: `scripts/experiment_gqa.py`, CLI parsing only. It requires an
+explicit accepted checkpoint/hash and first checks eight-KV MHA equivalence,
+two-KV cached/uncached parity (including context overflow), and actual cache
+storage. Both arms then use the same random training windows (sampler seed 1338),
+fresh AdamW, BF16, batch 8, accumulation 2 and constant learning rate .00003 for
+exactly 150 updates. This shared adaptation sampler is explicit even if a prior
+pretraining recipe used equal-byte epochs; neither adaptation arm uses a different
+sampler. Every 50 updates saves model, optimizer and CPU/MPS RNG state.
+
+Before/after validation scores the same pinned exact-byte validation windows.
+Both adapted models receive the same 20-generation audit. Afterward, an alternating
+paired decode comparison uses 128 past positions, two warmup pairs and ten measured
+pairs. Sequential per-arm timings are retained but do not decide the 5% latency
+gate. Numerical gates cannot promote a model without raw-output inspection. No
+part of this runner has yet executed model computations on the GPU.
+
 ## Question and forecast
 
 Can eight query heads share two KV heads without losing useful prediction
