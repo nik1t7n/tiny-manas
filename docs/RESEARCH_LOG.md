@@ -51,6 +51,15 @@ handling and recorded a concrete dropout-preservation risk in
 must include dropout 0.2, gradients and post-backward RNG state; eval-only parity
 would not establish correctness. Defer execution until O02/O03 decisions.
 
+**O05 preparation (not executed):** found the owner's existing nested 8k/16k/32k
+v1 tokenizers. Verified all three tokenizer hashes and the eight original
+training shard hashes against their real training manifest. 32k exactly matches
+the frozen LM artifact. Reuse this training rather than repeat it. Reconstructed
+train/validation text boundaries are exact UTF-8 prefixes (2,924,452 / 164,489
+bytes, no replacement characters). [05-tokenizer.md](experiments/05-tokenizer.md)
+specifies equal original-text exposure, a fresh 32k control and exact-byte
+validation to prevent shifted splits or unfair token-count comparisons.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31
