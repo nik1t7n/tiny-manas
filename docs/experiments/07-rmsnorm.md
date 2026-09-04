@@ -2,6 +2,17 @@
 
 Status: preregistered, **not run**. Follow the RoPE decision. Date: 2026-09-04.
 
+Prepared candidate: `scripts/architecture_candidates.py::with_rmsnorm`. It
+copies the current CPU reference and replaces only the 17 normalization sites,
+preserving shared tensors. `FP32RMSNorm` uses the installed native `nn.RMSNorm`
+with explicit epsilon 1e-5 and FP32 input, then casts the output to the incoming
+dtype. This avoids assuming a particular dtype-dependent default epsilon or
+internal accumulation behavior. The installed wrapper calls `F.rms_norm`;
+native MPS performance and numerical correctness remain unverified until the
+queued real probe. No manual-formula or CPU fallback will hide an unsupported
+operation. The [PyTorch API documentation](https://docs.pytorch.org/docs/2.13/generated/torch.nn.RMSNorm.html)
+confirms the scale parameter and epsilon interface; it does not prove a speedup.
+
 ## Question and forecast
 
 Is centering each token's features useful enough here to justify its cost?

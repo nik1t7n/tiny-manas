@@ -2,6 +2,15 @@
 
 Status: preregistered, **not run**. Follow normalization selection. Date: 2026-09-04.
 
+Prepared candidate: `scripts/architecture_candidates.py::with_swiglu`. It copies
+the current CPU reference and replaces only the FFNs. A separate CPU generator,
+seed 1337, initializes the new gate/up/down tensors; shared non-FFN weights stay
+identical. The training RNG must be reset after construction in both arms. Input
+projection weights use std .02, output weights use .02/sqrt(2L), and biases start
+at zero. The candidate rejects widths that cannot preserve the exact matrix
+budget rather than rounding without disclosure. No candidate training or MPS
+probe has run; source preparation is not an acceptance result.
+
 ## Question and forecast
 
 Can a learned multiplicative gate improve held-out prediction without simply
