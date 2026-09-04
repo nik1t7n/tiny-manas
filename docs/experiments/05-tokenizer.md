@@ -77,9 +77,12 @@ short final window explicitly. Right-padding uses masked targets (`-100`),
 never a fake learned padding token; normalize accumulated loss by the actual
 number of scored targets. Future padded positions must not affect valid tokens.
 
-Reserve the same first complete source line as an unscored initial prefix in
-all variants. Verify that this raw-text boundary coincides with token boundaries
-for all three before running; score the same remaining source bytes. This avoids
+Reserve the same short source prefix (roughly 64–128 characters, ending at a
+shared pre-tokenization boundary) as unscored initial context in all variants.
+Do not use the first line: inspection confirmed that the processed epic is a
+single line. Verify that prefix and remainder tokenization concatenate exactly
+to the full sequence for all three before running; score the same remaining
+source bytes. This avoids
 quietly omitting a different first-token span in each vocabulary. Record exact
 scored bytes per epoch and learning-rate schedule by fraction of that byte budget,
 not by a common token-step number. Smaller vocabularies can need more updates.
@@ -90,8 +93,9 @@ fresh candidate weights separate from every existing accepted checkpoint.
 
 ## Validation and decision
 
-Use the identical frozen validation text with one common unscored first-line
-prefix. Sum next-token negative log probabilities over the same remaining bytes,
+Use the identical frozen validation text with one common short unscored prefix,
+selected by the same token-boundary verification as training. Sum next-token
+negative log probabilities over the same remaining bytes,
 scoring each target once with a documented sliding-context protocol. Report
 `bits_per_byte = summed_NLL / log(2) / scored_UTF8_bytes` and the target-byte hash.
 Do not multiply random-batch token loss by a whole-split average and call it

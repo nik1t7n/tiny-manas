@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -25,18 +26,44 @@ def _words(text: str) -> list[str]:
     return re.findall(r"[\wӨҮҢөүң'-]+", text, flags=re.UNICODE)
 
 
-def longest_copied_word_span(generated: str, corpus: str, maximum_words: int = 40) -> dict[str, Any]:
+def longest_copied_word_span(generated: str, corpus: str) -> dict[str, Any]:
+    """Match whole case-folded word sequences, ignoring punctuation/whitespace.
+
+    Both sides use the same tokenizer. This is not a verbatim byte-match metric.
+    Disable SequenceMatcher's frequent-element heuristic: common epic words are
+    legitimate parts of a copied span. Report the actual longest span, uncapped.
+    """
     words = _words(generated)
     if not words:
         return {"words": 0, "text": ""}
-    upper = min(maximum_words, len(words))
-    corpus_casefolded = corpus.casefold()
-    for size in range(upper, 3, -1):
-        for start in range(len(words) - size + 1):
-            candidate = " ".join(words[start : start + size])
-            if candidate.casefold() in corpus_casefolded:
-                return {"words": size, "text": candidate}
-    return {"words": 0, "text": ""}
+    match = SequenceMatcher(
+        None,
+        [word.casefold() for word in _words(corpus)],
+        [word.casefold() for word in words],
+        autojunk=False,
+    ).find_longest_match()
+    if match.size < 4:
+        return {"words": 0, "text": ""}
+    return {"words": match.size, "text": " ".join(words[match.b:match.b + match.size])}
+
+
+def audit_summary(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    copied_lengths = [sample["longest_copied_word_span"]["words"] for sample in samples]
+    repeated_trigrams = [sample["repetition"]["repeated_trigram_ratio"] for sample in samples]
+    return {
+        "samples": len(samples),
+        "maximum_normalized_copied_words": max(copied_lengths, default=0),
+        "mean_repeated_trigram_ratio": sum(repeated_trigrams) / len(repeated_trigrams) if samples else 0.0,
+    }
+
+
+WORD_MATCH_PROTOCOL = {
+    "version": 2,
+    "matching": "identical contiguous casefolded word sequences; punctuation and whitespace ignored",
+    "minimum_words": 4,
+    "maximum_words": None,
+    "verbatim_byte_matching": False,
+}
 
 
 def repetition_stats(text: str) -> dict[str, Any]:
@@ -84,23 +111,18 @@ def run_generation_audit(
             sample["repetition"] = repetition_stats(continuation)
             samples.append(sample)
 
-    copied_lengths = [sample["longest_copied_word_span"]["words"] for sample in samples]
-    repeated_trigrams = [sample["repetition"]["repeated_trigram_ratio"] for sample in samples]
     result = {
         "checkpoint": str(Path(checkpoint).resolve()),
         "dataset": dataset_name,
         "protocol": {
+            "word_matching": WORD_MATCH_PROTOCOL,
             "prompts": list(DEFAULT_PROMPTS),
             "seeds": list(DEFAULT_SEEDS),
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
             "top_k": top_k,
         },
-        "summary": {
-            "samples": len(samples),
-            "maximum_exact_copied_words": max(copied_lengths, default=0),
-            "mean_repeated_trigram_ratio": sum(repeated_trigrams) / len(repeated_trigrams),
-        },
+        "summary": audit_summary(samples),
         "samples": samples,
     }
     output_path = Path(output).resolve()

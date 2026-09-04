@@ -60,6 +60,22 @@ bytes, no replacement characters). [05-tokenizer.md](experiments/05-tokenizer.md
 specifies equal original-text exposure, a fresh 32k control and exact-byte
 validation to prevent shifted splits or unfair token-count comparisons.
 
+**Measurement correction:** source inspection and real saved generations found
+asymmetric normalization in the copying audit. Nine of the original 20 samples
+were undercounted; normalized longest match is nine words rather than seven.
+A real source excerpt also failed the old matcher. Correct the shared matcher,
+version the protocol and re-audit saved outputs without new generation. See
+[audit correction](experiments/00-audit-correction.md). The already-running O02
+controller retains the old imported code; both its outputs must be re-audited
+before acceptance. Training remains unchanged and must not be restarted.
+
+**Correction verified:** the saved 20-sample baseline now reports nine normalized
+matching words; repeated-trigram mean remains 0.0421294. A bounded real source
+excerpt matches all 142 words. Original audits/snapshot untouched; README's two
+affected statements now use corrected terminology and evidence. An initial
+line-based control exposed that processed Manas is a single line, so the future
+tokenizer sampler uses a short shared token-boundary prefix, not the first line.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31

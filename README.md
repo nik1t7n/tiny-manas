@@ -33,7 +33,7 @@ Two conclusions survived the measurements:
 1. Doubling the context window from 256 to 512 made the model slower and worsened held-out prediction.
 2. Increasing depth and width reduced validation perplexity by 25.4% and test perplexity by 23.1% relative to the 13M baseline.
 
-The final model generated recognizable epic-like text for short stretches. It still repeated names and formulaic phrases, invented malformed words, and lost track of events over longer passages. Across 20 fixed samples, the longest exact match with the training text was seven words. The gain did not come from copying long passages verbatim.
+The final model generated recognizable epic-like text for short stretches. It still repeated names and formulaic phrases, invented malformed words, and lost track of events over longer passages. Across 20 fixed samples, the longest matching word sequence in the training text was nine words after normalizing case, punctuation and whitespace. A [corrected audit](docs/experiments/00-audit-correction.md) replaced the earlier undercount of seven. These samples contained no long copied word sequences; they do not prove that the model never memorizes other passages.
 
 ## The complete pipeline
 
@@ -475,7 +475,7 @@ This metric remains tied to the same source encoding, but it helps separate lang
 
 Metrics cannot reveal every failure mode. Each accepted full-data model generates 20 fixed samples from five prompts and four seeds. Every sample uses temperature `0.8`, top-k `40`, and 256 new tokens.
 
-The audit records repeated-trigram ratios and searches for exact word spans copied from training. The final model's mean repeated-trigram ratio was 4.21%. Its longest exact training match contained seven words. One sample still reached a 25.7% repeated-trigram ratio, so the mean does not hide the worst repetition case.
+The audit records repeated-trigram ratios and searches for identical consecutive word sequences after applying the same word extraction and case normalization to both texts. This ignores punctuation and whitespace differences; it is not a verbatim byte-match metric. The final model's mean repeated-trigram ratio was 4.21%, and its longest normalized training match contained nine words. The earlier seven-word result came from asymmetric normalization and was corrected by reanalyzing the same saved generations, without another model run. One sample still reached a 25.7% repeated-trigram ratio, so the mean does not hide the worst repetition case.
 
 All fixed outputs live in [`reports/generation-audits`](reports/generation-audits). They are not a hand-picked showcase.
 
