@@ -138,6 +138,15 @@ the temporary O05 sampler. Save and hash a fresh seed-1337 reference initializat
 run the prepared RoPE numerical/cost gate, and proceed to complete matched
 training only if it passes. O02 BF16 provides the existing matched control.
 
+**O06 result: correctness passed, cost gate failed.** Real-input Q/K norm and
+shared-offset checks passed (maximum errors 4.7684e-7 and 2.6941e-5); causal
+suffix isolation was exact and all tensors received gradients. Removing learned
+positions saved 98,304 parameters but not material sampled memory. Median update
+time increased from 0.306037 to 0.343599 seconds (+12.2735%), consistently in
+both halves of the measured samples. This exceeds the preregistered 10% limit:
+do not spend a full run, do not promote RoPE, keep learned positions. Artifact
+and limits are in report 06. Next: O07 RMSNorm using the same fresh reference.
+
 **O06–O08 execution preparation while 16k trains:** added a shared full-run
 driver with explicit original-random/equal-byte recipes, hashed initial states,
 probe provenance gates and resumable segment checkpoints. RoPE's prepared probe

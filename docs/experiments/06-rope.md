@@ -1,7 +1,7 @@
 # 06 — Rotary positions versus learned position embeddings
 
-Status: preregistered, **not run**. Execute after experiment 05 selects its
-tokenizer. Date: 2026-09-04.
+Status: **correctness passed; rejected by the preregistered cost gate**. Keep
+learned position embeddings. Date: 2026-09-04.
 
 Preparation while O05 runs: `scripts/rotary_candidate.py` contains the isolated
 candidate, and `scripts/experiment_architecture_probe.py --change rope` contains its real-data numerical
@@ -134,3 +134,42 @@ for example by explicitly rebuilding the cropped-window cache. A rolling-cache
 policy with different historical context is a separate semantic change, not an
 inference-equivalent speedup. Compare cached and uncached outputs on both sides
 of the context boundary before adoption.
+
+## Result and decision
+
+Command:
+
+```text
+.venv/bin/python scripts/experiment_architecture_probe.py --vocabulary 32768 --change rope --reference-initial runs/optimization-06-reference-20260904/initial-model.pt --output runs/optimization-06-rope-probe-20260904
+```
+
+The reference initialization hash is
+`89ff070be491d496dbdbd708e1073eacc258f7214fb111e4c3517b57a1c54457`.
+The MPS probe used commit `70b271ac54a9000ade4475610242965406ea5997`.
+
+Correctness passed on real corpus inputs. Q/K norm error was at most 4.7684e-7;
+a shared position offset of 137 changed attention scores by at most 2.6941e-5;
+changing the real suffix caused exactly zero change to preceding logits. Every
+trained tensor received a gradient. Removing the learned position table saved
+98,304 parameters; sampled allocation was essentially unchanged (2.254 GB
+control, 2.252 GB RoPE).
+
+| 35-update probe (first 5 excluded) | Control | RoPE |
+| --- | ---: | ---: |
+| Median update seconds | 0.306037 | 0.343599 |
+| Mean update seconds | 0.315128 | 0.351246 |
+| First-half median | 0.303459 | 0.341756 |
+| Second-half median | 0.306400 | 0.345257 |
+
+RoPE is **12.2735% slower**, beyond the 10% ceiling. The result is not explained
+by one outlier: both halves show the same direction and similar magnitude.
+Therefore stop before the full 3,000-update quality run and **do not promote
+RoPE** on this MPS workload. The slightly lower final probe loss is neither a
+validation result nor evidence of quality; these short arms have different
+architectures and exist only to test correctness/cost. Test and generation
+audits were not used after the preregistered falsifier fired.
+
+Artifact: `runs/optimization-06-rope-probe-20260904/result.json`. This result
+does not claim that RoPE is generally worse, or that it could not help longer
+contexts. It says that this FP32-rotation implementation misses Tiny Manas's
+declared resource boundary at context 256 on the actual M5 host.

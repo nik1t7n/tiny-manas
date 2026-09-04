@@ -15,7 +15,7 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 - [x] 03 — `torch.compile` and fusion. [Rejected on this MPS workload](03-compile.md): diagnosed a broadcast-gradient failure; corrected candidate passed parity but updates were 3.02% slower.
 - [x] 04 — Activation checkpointing. [Accepted opt-in, off by default](04-checkpointing.md): 38.46% less sampled allocation, 30.63% slower updates; explicit MPS dropout-RNG preservation verified.
 - [x] 05 — 32k / 16k / 8k tokenizer comparison. [Keep incumbent 32k](05-tokenizer.md): smaller variants save resources but worsen validation BPB by 4.15% / 3.84% versus the accepted model, beyond the 1% limit. All 60 new raw outputs reviewed.
-- [ ] 06 — RoPE versus learned positions. [Preregistered](06-rope.md); context and cache-boundary semantics remain explicit.
+- [x] 06 — RoPE versus learned positions. [Rejected on this MPS path](06-rope.md): correctness passed, but median updates were 12.27% slower, beyond the 10% ceiling. Keep learned positions.
 - [ ] 07 — RMSNorm versus LayerNorm. [Preregistered](07-rmsnorm.md).
 - [ ] 08 — SwiGLU versus parameter-matched GELU FFN. [Preregistered](08-swiglu.md).
 - [ ] 09 — KV cache with separate prefill/decode on the accepted MHA checkpoint. [Preregistered](09-kv-cache.md).
