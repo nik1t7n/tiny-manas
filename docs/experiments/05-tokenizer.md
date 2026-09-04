@@ -224,3 +224,35 @@ This is a different evaluation protocol from the earlier random-batch 4.3457791;
 the difference is not an improvement in model weights. The incumbent checkpoint
 and tokenizer hashes match the accepted-state record. Artifact:
 `runs/optimization-05-tokenizers-20260904/incumbent/result.json`.
+
+## Tokenizer promotion and reproducibility checks
+
+Read-only source tracing identified the integration boundaries before selection:
+
+- `data.load_tokenizer` verifies the original 32k hash even when a path is given.
+- `prepare_dataset` uses the original tokenizer and token-count split boundaries.
+- `experiment.generate_text` and `audit.run_generation_audit` load that tokenizer
+  internally; the current O05 runner bypasses neither check silently, but uses
+  its own manifest-verified tokenizer and fixed text splits explicitly.
+- Ordinary checkpoint export expects original dataset/config/step metadata.
+- Service startup verifies the original tokenizer hash as well as checkpoint
+  bytes. No service change or deployment is part of candidate training.
+
+If a smaller vocabulary passes selection, update these shared entry points with
+explicit checkpoint/dataset tokenizer provenance and vocabulary-size agreement.
+Keep legacy defaults for old checkpoints, preserve the original prepared data,
+and do not rebuild raw splits by fractions of a new token count. Acceptance
+requires a real train/generate path for the chosen vocabulary, not just a
+research-only checkpoint that ordinary code would decode with the wrong table.
+Do not loosen hash verification to “accept any tokenizer file.”
+
+The smaller artifacts need not depend on a private working-directory path for
+reproduction. A CPU-only verification reconstructed both from the already pinned
+public 32k tokenizer: retain vocabulary IDs below N and the first N-256 merges,
+preserve the remaining configuration, then serialize with the installed
+`tokenizers` library. This is the original tokenizer project's
+`_derive_nested_variant` construction, applied to its 32k prefix rather than the
+larger master. The resulting **file bytes**, not just token counts, matched the
+prepared 16k and 8k artifacts and their recorded SHA-256 hashes. No BPE training,
+text mutation, GPU computation or new publication was required. If a variant
+wins, use this deterministic verified derivation for its public preparation path.
