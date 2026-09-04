@@ -64,3 +64,10 @@ calculations. The accepted inference export's size and SHA-256 were checked
 against the actual local file. No training, generation, test suite, or deployment
 was run for manuscript preparation. Reproduction instructions and the complete
 paper source are retained in the same commit as this checklist.
+
+## Owner revision
+
+Removed all appendices after References from the delivered manuscript at the
+owner's request. Removed or redirected the five corresponding in-text references
+to repository records. The previous complete version remains in Git history;
+the evidence files and experiment documentation are unchanged.

@@ -11,7 +11,7 @@ conference's nine-page submission limit.
 
 ## Files
 
-- `main.tex`: complete manuscript, bibliography, and appendices.
+- `main.tex`: manuscript and bibliography; the PDF ends at References.
 - `neurips_2026.sty`: unmodified official template; attribution retained.
 - `figures/*.pdf`: five original vector figures with embedded Arial fonts.
 - `data/*.csv`: observed training/evaluation curves and per-sample audit metrics.
