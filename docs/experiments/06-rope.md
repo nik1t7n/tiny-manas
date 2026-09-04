@@ -3,6 +3,25 @@
 Status: preregistered, **not run**. Execute after experiment 05 selects its
 tokenizer. Date: 2026-09-04.
 
+Preparation while O05 runs: `scripts/rotary_candidate.py` contains the isolated
+candidate, and `scripts/experiment_rope_probe.py` contains its real-data numerical
+and cost gate. Neither changes the accepted model or loads into the ordinary
+checkpoint path. Only command-line parsing has been checked; do not interpret
+prepared code as a successful RoPE experiment. No concurrent GPU probe is allowed.
+
+After vocabulary selection, the probe checks FP32 Q/K norms and shared-offset
+score invariance (offset 137), causal isolation using two real corpus suffixes,
+the exact 98,304-parameter difference, and gradients for every trained tensor.
+Then both fresh arms receive 35 identical real updates with dropout .2 and BF16;
+exclude the first five from median latency. Shared initialization is copied
+tensor-for-tensor. Both probe arms use constant learning rate .0003; this is
+a correctness/cost measurement, not the full warmup/cosine quality experiment.
+Full training remains necessary after a successful cost gate. A clear >10%
+latency regression fails the existing acceptance ceiling before spending a
+complete training run; borderline timings require a bounded paired recheck,
+not automatic acceptance. Rotation tables are fixed FP32 nonpersistent buffers;
+rotation arithmetic uses FP32 and casts results back to the incoming Q/K dtype.
+
 ## Question and forecast
 
 Can position-dependent rotations improve held-out continuation prediction on
