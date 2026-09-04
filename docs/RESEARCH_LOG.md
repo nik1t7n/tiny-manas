@@ -114,6 +114,16 @@ remain; do not mistake the shorter copying span for better language modeling.
 Keep this arm as the within-protocol control, not a promoted checkpoint.
 The controller has started 16k after its real padded-window BF16 preflight.
 
+**O05 16k complete:** 30 epochs / 3,420 updates, best epoch 23, validation
+0.9128487286 BPB. Relative to fresh 32k: 0.9162% better BPB, 16.0857% more
+scored bytes/s, 19.9116% less sampled tensor allocation (driver only 3.7345%
+less). It remains 4.1539% worse than the incumbent: the 1% quality floor fails,
+so do not promote it. Read all 20 outputs; reduced trigram repetition (2.9042%
+mean) coexists with name/phrase loops and subword degeneration. Generated text
+is shorter in bytes/words under the fixed token budget. Full evidence and raw
+review are in report 05. The controller moved to 8k after its real preflight;
+no architecture run may compete for the GPU yet.
+
 **O06–O08 execution preparation while 16k trains:** added a shared full-run
 driver with explicit original-random/equal-byte recipes, hashed initial states,
 probe provenance gates and resumable segment checkpoints. RoPE's prepared probe

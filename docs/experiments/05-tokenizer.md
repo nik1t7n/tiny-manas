@@ -320,10 +320,62 @@ this comparison cannot assign the regression to one of them or to vocabulary
 size, which stayed 32k. The control remains necessary for isolating vocabulary
 effects within O05. A smaller candidate must still pass the incumbent floor.
 
-## 16k arm started
+## Completed 16k arm
 
 The controller moved on to 16k without a concurrent GPU process. Its real
 preflight passed: active targets 2048/1987, accumulation weights
 0.50755886/0.49244114, short input length 195, maximum padded/trimmed FP32 logit
 difference 2.2650e-6. The BF16 update produced finite loss 9.78747 and
-pre-clipping gradient norm 6.28557. Full quality results remain pending.
+pre-clipping gradient norm 6.28557.
+
+All 30 epochs / 3,420 updates completed. Best epoch: 23. The checkpoint reload
+reproduced its exact-byte validation result. All 20 raw generations were read.
+
+| Measurement | 16k result |
+| --- | ---: |
+| Parameters | 20,586,240 |
+| Validation bits/byte | 0.9128487286 |
+| Mean token loss, not comparable across vocabularies | 4.0332326378 |
+| Validation NLL / targets / scored bytes | 103,996.9036 / 25,785 / 164,360 |
+| Training-only seconds | 918.7949 |
+| Scored training bytes/second | 95,483.53 |
+| Median of epoch 2–30 median update seconds | 0.2615374 |
+| Maximum sampled allocated / driver bytes | 1,805,126,144 / 3,460,169,728 |
+| Mean / worst repeated-trigram ratio | 2.9042% / 17.0543% |
+| Maximum normalized copied span | 6 words |
+| Total generated UTF-8 bytes / words | 31,528 / 2,480 |
+
+Against fresh 32k under the same equal-byte recipe, 16k improves validation BPB
+by 0.9162%, increases useful-byte throughput by 16.0857%, and reduces sampled
+tensor allocation by 19.9116%. Driver-memory reduction is only 3.7345%; this is
+not a 20% reduction in total device memory. The vocabulary change also reduces
+tied embedding/head capacity, so this measures the actual size tradeoff, not
+a constant-parameter model with a different tokenizer.
+
+However, BPB is still **4.1539% worse than the incumbent**, outside the permitted
+1% regression. Therefore **do not promote 16k**, despite its resource savings
+and lower exact phrase repetition. Keep the checkpoint as a measured candidate.
+
+Raw review: samples 1–5 recycle character/epic descriptors; 6 moves from dialogue
+to recurring weapon requests; 7–9 change actors or drift between scenes. Sample
+10 repeatedly emits the same riding phrase. Sample 11 has strings such as
+`Түгөнгөнгөнгөндө`, illustrating subword degeneration that word-trigram counts
+miss. Samples 12 and 15 return to Beijing/Karykan without sustained progression;
+13 repeats fighting/weapon clauses; 14 and 16 shuffle combat descriptions.
+17 repeats the forty-warrior motif; 18 cycles attack/movement phrases; 19 enters
+a conspicuous Kongurbay/name loop (the 17.05% worst case); 20 repeats Manas
+descriptors and age phrases. None of this establishes improved narrative
+coherence. Lower word repetition is not a native-speaker quality assessment.
+
+The same 256 generated tokens now cover fewer words/bytes than either 32k arm;
+this affects repetition/copy opportunities and must accompany those metrics.
+Artifact: `runs/optimization-05-tokenizers-20260904/16384/result.json`.
+Best-checkpoint SHA-256:
+`401650ba507e22e31f499bb27f143346441f710018d1c417a968d5addc3b2dab`.
+
+## 8k arm started
+
+The final arm passed its real preflight: active targets 2048/1880, accumulation
+weights 0.52138493/0.47861507, short input length 88, padded/trimmed FP32 logit
+difference 2.3246e-6. A BF16 update had finite loss 9.08400 and gradient norm
+6.21082. Training is underway; this is not yet a vocabulary-selection result.
