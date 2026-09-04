@@ -87,6 +87,12 @@ sequences match the frozen audit. All continuations were read and re-audited
 under word-match protocol 2 (maximum 9, mean trigram repetition 0.0421294).
 BF16 is now training automatically; no precision promotion yet.
 
+**O05 promotion-gate correction before execution:** the fresh 32k run controls
+the tokenizer comparison but could itself underperform our incumbent because
+the equal-text sampler is new. Added exact-byte evaluation of the incumbent as
+a second 1% quality floor. Also require decoded generation lengths so shorter
+8k/16k continuations do not receive a misleading repetition or copying advantage.
+
 **O05 data preparation complete, training not started:** created one read-only
 manifest-pinned bundle of the existing three tokenizers and exactly matching
 train/validation text. See O05 report for directory and manifest hash. CPU

@@ -109,6 +109,22 @@ bits/byte no more than 1% worse than the fresh 32k control, and no obvious raw
 generation deterioration. A better quality candidate with higher cost gets an
 explicit tradeoff review, not an automatic win. Otherwise keep 32k.
 
+The fresh 32k control isolates vocabulary size under the new equal-text training
+protocol, but it does **not** replace the currently accepted model as the quality
+floor. Evaluate the incumbent accepted 32k checkpoint with the same exact-byte
+validation windows. A smaller-vocabulary candidate must be no more than 1% worse
+in bits/byte than both the fresh 32k control and the incumbent. Otherwise an
+apparent win could merely exploit a worse fresh training protocol and still
+degrade the model we already have. The incumbent comparison does not isolate one
+variable, so report it separately as a promotion safety gate, not as evidence
+that one tokenizer caused every difference.
+
+For generation, keep the declared 256 output-token budget because that is the
+served inference cost, but report decoded byte and word counts for every sample.
+A smaller tokenizer generally emits fewer bytes per 256 tokens; therefore a
+shorter copied span or fewer repeated trigrams cannot be interpreted as better
+memorization/repetition behavior without considering generated length.
+
 ## Real-text sizing check before training
 
 CPU-only encoding of the verified train/validation text produced the following
