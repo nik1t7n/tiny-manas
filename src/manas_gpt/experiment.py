@@ -212,6 +212,8 @@ def export_inference_checkpoint(checkpoint: str | Path, output: str | Path) -> d
         "step": payload["step"],
         "best_validation_loss": payload["best_validation_loss"],
     }
+    if "research_provenance" in payload:
+        exported["research_provenance"] = payload["research_provenance"]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_suffix(output_path.suffix + ".tmp")
     torch.save(exported, temporary)

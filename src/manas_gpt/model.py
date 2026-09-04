@@ -11,6 +11,7 @@ from torch.nn import functional as F
 from .config import ModelConfig
 from .checkpointing import checkpoint_block
 from .kv_cache import CacheSession
+from .rotary import RotaryAttention
 
 
 class CausalSelfAttention(nn.Module):
@@ -63,6 +64,8 @@ class TransformerBlock(nn.Module):
         super().__init__()
         self.ln_attention = nn.LayerNorm(config.n_embd, bias=config.bias)
         self.attention = CausalSelfAttention(config)
+        if config.position_encoding == "rope":
+            self.attention = RotaryAttention(self.attention, config.block_size)
         self.ln_ffn = nn.LayerNorm(config.n_embd, bias=config.bias)
         self.ffn = FeedForward(config)
 
@@ -76,6 +79,8 @@ class ManasGPT(nn.Module):
         super().__init__()
         if config.vocab_size < 1:
             raise ValueError("ModelConfig.vocab_size must be set before model construction")
+        if config.position_encoding not in ("learned", "rope"):
+            raise ValueError("position_encoding must be learned or rope")
         self.config = config
         self.activation_checkpointing = False
         self.token_embedding = nn.Embedding(config.vocab_size, config.n_embd)
@@ -92,6 +97,10 @@ class ManasGPT(nn.Module):
         for name, parameter in self.named_parameters():
             if name.endswith("attention.output.weight") or name.endswith("ffn.net.2.weight"):
                 nn.init.normal_(parameter, mean=0.0, std=residual_std)
+        if config.position_encoding == "rope":
+            # Initialize the classic graph first, then remove this table, exactly
+            # as in the controlled research candidate. Shared tensors retain RNG order.
+            del self.position_embedding
 
     @staticmethod
     def _init_weights(module: nn.Module) -> None:
@@ -116,8 +125,10 @@ class ManasGPT(nn.Module):
             raise ValueError(
                 f"Sequence length {time} exceeds block size {self.config.block_size}"
             )
-        positions = torch.arange(time, device=token_ids.device)
-        x = self.token_embedding(token_ids) + self.position_embedding(positions)[None, :, :]
+        x = self.token_embedding(token_ids)
+        if self.config.position_encoding == "learned":
+            positions = torch.arange(time, device=token_ids.device)
+            x = x + self.position_embedding(positions)[None, :, :]
         x = self.embedding_dropout(x)
         for block in self.blocks:
             if self.activation_checkpointing and self.training and torch.is_grad_enabled():
@@ -166,7 +177,7 @@ class ManasGPT(nn.Module):
 
     def parameter_count(self, non_embedding: bool = False) -> int:
         count = sum(parameter.numel() for parameter in self.parameters())
-        if non_embedding:
+        if non_embedding and hasattr(self, "position_embedding"):
             count -= self.position_embedding.weight.numel()
         return count
 

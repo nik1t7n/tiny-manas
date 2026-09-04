@@ -37,6 +37,7 @@ class ModelConfig:
     bias: bool
     tie_embeddings: bool
     vocab_size: int = 0
+    position_encoding: str = "learned"
 
     def with_vocab_size(self, vocab_size: int) -> ModelConfig:
         return ModelConfig(**{**self.__dict__, "vocab_size": vocab_size})

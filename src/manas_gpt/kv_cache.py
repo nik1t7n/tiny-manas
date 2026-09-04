@@ -1,16 +1,20 @@
 """Request-local inference cache; overflow preserves crop-and-recompute semantics."""
 import torch
 from torch.nn import functional as F
+from .rotary import RotaryAttention, rotate_pairs
 
 
 class CacheSession:
     def __init__(self, model):
         if model.training:
             raise ValueError("KV caching requires model.eval(); training stays uncached")
-        if not hasattr(model, "position_embedding"):
-            raise ValueError("This cache implements the learned-position architecture")
+        self.rotary = model.config.position_encoding == "rope"
+        if not self.rotary and not hasattr(model, "position_embedding"):
+            raise ValueError("A learned-position model requires its position table")
         for block in model.blocks:
             attention = block.attention
+            if self.rotary != isinstance(attention, RotaryAttention):
+                raise ValueError("Cache position encoding does not match attention modules")
             kv_heads = getattr(attention, "n_kv_head", attention.n_head)
             width = model.config.n_embd + 2 * kv_heads * (model.config.n_embd // attention.n_head)
             if kv_heads < 1 or attention.n_head % kv_heads or attention.qkv.out_features != width:
@@ -27,7 +31,9 @@ class CacheSession:
             raise ValueError("The cached model must remain in evaluation mode")
         batch, time = token_ids.shape
         positions = torch.arange(offset, offset + time, device=token_ids.device)
-        x = model.token_embedding(token_ids) + model.position_embedding(positions)[None]
+        x = model.token_embedding(token_ids)
+        if not self.rotary:
+            x = x + model.position_embedding(positions)[None]
         x = model.embedding_dropout(x)
         layers = []
         for index, block in enumerate(model.blocks):
@@ -38,6 +44,9 @@ class CacheSession:
                 (model.config.n_embd, kv_heads * dim, kv_heads * dim), dim=-1)
             q = q.view(batch, time, attention.n_head, dim).transpose(1, 2)
             k, v = (value.view(batch, time, kv_heads, dim).transpose(1, 2) for value in (k, v))
+            if self.rotary:
+                cos, sin = attention.cos[offset:offset + time], attention.sin[offset:offset + time]
+                q, k = rotate_pairs(q, cos, sin), rotate_pairs(k, cos, sin)
             if past is not None:
                 k = torch.cat((past[index][0], k), dim=-2)
                 v = torch.cat((past[index][1], v), dim=-2)
