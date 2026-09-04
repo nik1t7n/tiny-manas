@@ -6,7 +6,7 @@
 
 Tiny Manas is a small language model that learns to continue one edition of the Kyrgyz epic *Manas*. I wrote the model and the training pipeline to study the complete language-model path without hiding the important mechanics behind a large framework: verified text acquisition, byte-level BPE tokenization, shifted training batches, causal self-attention, backpropagation, checkpoint selection, generation, and memorization analysis.
 
-The final model has 26,877,696 parameters. It contains eight Transformer blocks, eight attention heads, 384 features per token, and a context window of 256 tokens. I trained it on an M5 MacBook Pro with 16 GB of unified memory. The accepted run took 24.4 minutes.
+The original accepted model has 26,877,696 parameters. It contains eight Transformer blocks, eight attention heads, 384 features per token, and a context window of 256 tokens. I trained it on an M5 MacBook Pro with 16 GB of unified memory. That run took 24.4 minutes. The optimization series below builds on a frozen copy of this model and its evidence.
 
 Tiny Manas is a research model, not a general Kyrgyz assistant. It has seen one edition of one epic. It can reproduce names, rhythm, speech patterns, and short chains of action from that source distribution. It cannot answer general questions, follow instructions, or maintain a reliable long narrative.
 
@@ -22,6 +22,8 @@ The project follows the spirit of Tiny Shakespeare experiments, with a Kyrgyz so
 
 ## Results at a glance
 
+These are the original full-data experiments from August 31, 2026. Their test scores belong to those checkpoints; I do not transfer them to newer weights.
+
 | Model | Context | Parameters | Validation loss | Validation perplexity | Test loss | Test perplexity | Training time |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | 13M baseline | 256 | 13,193,216 | 4.6384 | 103.38 | 5.0201 | 151.42 | 15.1 min |
@@ -34,6 +36,21 @@ Two conclusions survived the measurements:
 2. Increasing depth and width reduced validation perplexity by 25.4% and test perplexity by 23.1% relative to the 13M baseline.
 
 The final model generated recognizable epic-like text for short stretches. It still repeated names and formulaic phrases, invented malformed words, and lost track of events over longer passages. Across 20 fixed samples, the longest matching word sequence in the training text was nine words after normalizing case, punctuation and whitespace. A [corrected audit](docs/experiments/00-audit-correction.md) replaced the earlier undercount of seven. These samples contained no long copied word sequences; they do not prove that the model never memorizes other passages.
+
+### Optimization series: current accepted changes
+
+On September 4 I froze the original source, configurations, data, tokenizer and checkpoints before changing the implementation. The Git tag is `tiny-manas-pre-optimization-20260904`; the [baseline manifest](docs/experiments/00-baseline-manifest.json) records artifact hashes. This is a local recovery snapshot, not an off-site backup.
+
+| Experiment | Measured result on the M5 | Decision |
+|---|---|---|
+| Last-position LM head | B=1,T=256 forward: 7.307 → 5.894 ms; logits: 32 MiB → 128 KiB | Use during generation |
+| BF16 training | Matched full runs: 1548.04 → 1229.40 s; validation loss change +0.0000464 | Use for 27M training; keep evaluation/inference FP32 |
+| `torch.compile` | Original compiled gradients failed parity; corrected research variant passed but took 3.02% longer per update | Keep eager execution |
+| Activation checkpointing | 38.46% less sampled live allocation; 30.63% longer updates | Offer as an opt-in; leave off for the current model |
+
+The fresh FP32/BF16 runs both processed 12,288,000 training targets, with the same initialization, batches and schedule. BF16 cut training-loop wall time by 20.58% relative to that fresh FP32 control. Comparing against the older 24.4-minute run would mix precision with conditions from another session. I inspected all 20 fixed BF16 continuations: local epic patterns and the existing repetition problems remain. The speed improvement does not establish better prose.
+
+Vocabulary and architecture experiments are still in progress. I have not selected a smaller tokenizer, RoPE, RMSNorm, SwiGLU, a KV cache or GQA. The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) distinguish completed decisions from candidates. The optimization series has not used the test split for selection or changed the deployed checkpoint.
 
 ## The complete pipeline
 
@@ -484,7 +501,7 @@ All fixed outputs live in [`reports/generation-audits`](reports/generation-audit
 Generation starts with prompt token IDs and repeats five operations:
 
 1. Keep only the last 256 tokens when the sequence exceeds the context window.
-2. Run a forward pass and take the logits at the final position.
+2. Run the Transformer over that context, then apply the LM head to the final position only.
 3. Divide logits by temperature.
 4. Keep the top `k` logits and mask the rest to negative infinity.
 5. Apply softmax, sample one token, append it, and repeat.
@@ -499,6 +516,20 @@ Lower temperature concentrates probability on the current leaders. Higher temper
 
 The current implementation recomputes the active context after every generated token. It does not use a KV cache. This keeps the generation path short and inspectable, though it leaves speed on the table.
 
+### Project only the position we need
+
+Training needs a next-token prediction at each input position. Generation needs one prediction at the end. The original forward pass still constructed `[B,T,V]` logits before discarding the earlier positions. I moved the slice before the LM head when generation requests `last_position_only=True`:
+
+```text
+Transformer output:    [B, T, C]
+Take the last vector:  [B, 1, C]
+Project to vocabulary: [B, 1, V]
+```
+
+At B=1,T=256,V=32,768 with FP32 output, this reduces the logits tensor from 32 MiB to 128 KiB. It leaves attention and FFN computation over the context intact. The measured whole-forward improvement was 1.24x at that shape, not 256x. At T=1, the extra slice provided no savings and the measured path was slightly slower.
+
+I compared full and final-position logits on real validation inputs within absolute/relative tolerance 1e-4. Twenty greedy continuations matched, and seeded stochastic generation matched across the context-cropping boundary. Training keeps full logits; the API rejects a final-position request with training targets. See [experiment 01](docs/experiments/01-last-position.md).
+
 ## 11. Apple MPS execution
 
 Every accepted training and generation run used PyTorch MPS on an M5 MacBook Pro with 16 GB of unified memory. The code checks three conditions before training:
@@ -509,13 +540,39 @@ Every accepted training and generation run used PyTorch MPS on an M5 MacBook Pro
 
 An unsupported operation fails instead of moving silently to CPU. That makes hardware and timing claims auditable.
 
-| Candidate | Targets/s | Training time | Peak PyTorch MPS | Peak MPS driver |
+| Original candidate | Targets/s | Training time | Maximum sampled PyTorch MPS | Maximum sampled MPS driver |
 |---|---:|---:|---:|---:|
 | 13M / context 256 | 13,565 | 15.1 min | 468.5 MiB | 3.36 GiB |
 | 13M / context 512 | 11,894 | 17.2 min | 470.9 MiB | 3.36 GiB |
 | 27M / context 256 | 8,378 | 24.4 min | 959.4 MiB | 4.33 GiB |
 
-The final model stayed well inside the machine's memory capacity. Data variety limited the experiment before memory did.
+The original runs sampled allocation after optimizer updates. These values are lower bounds on live memory peaks; they do not capture all intermediate allocations. The model fit within the machine's memory capacity, and the remaining quality problems gave us reasons to investigate data variety.
+
+### BF16 forward computation, FP32 training state
+
+BF16 stores a floating-point value in 16 bits: one sign bit, eight exponent bits and seven fraction bits. FP32 uses the same eight exponent bits but 23 fraction bits. BF16 retains a similar representable range while rounding values more coarsely.
+
+I enable autocast around the training forward pass and loss. PyTorch chooses the supported operation dtypes; it does not turn every tensor into BF16. In the measured path, logits used BF16 while the loss, model parameters and AdamW state stayed FP32. Backward and optimizer updates run outside the autocast context. Evaluation and generation use FP32 so the quality comparison does not also change the evaluation arithmetic.
+
+The full 3,000-step comparison measured validation loss 4.345732722 for FP32 and 4.345779147 for BF16 on the same 100 held-out batches. The difference was +0.000046425 nats, within the preregistered +0.05 ceiling. Training throughput rose from 7,937.77 to 9,995.08 target positions/s, including the training loop's evaluation overhead.
+
+Memory savings depend on what we measure. The short probe sampled live allocations inside updates and found only a 2.1% reduction. The full runs sampled after updates and found a 33.83% reduction. Driver allocation changed little. These are different sampling protocols, and neither supports a claim that BF16 halves total training memory. The FP32 weights and optimizer state still occupy memory. [Experiment 02](docs/experiments/02-bf16.md) preserves both measurements and the raw-run paths.
+
+### Checkpointing trades recomputation for memory
+
+During backward, the model needs intermediate forward results to calculate gradients. Activation checkpointing retains a block's input and recomputes its internal operations when backward reaches that block. It reduces retained activations while doing more work.
+
+Dropout makes recomputation a correctness issue. Recomputing with a different random mask gives gradients for a different forward computation. In the first test on this installed PyTorch/MPS version, standard checkpointing changed the MPS random-generator state and produced relative gradient error 0.6758. I stopped that path before timing it.
+
+The opt-in implementation now captures the MPS RNG state at each checkpointed forward, restores it for recomputation, and then restores the outer RNG state. The corrected real-batch check retained the CPU/MPS RNG states and reduced relative gradient difference to about 6e-9. This implementation targets the project's eager MPS path; the experiment does not validate other devices or compilation.
+
+Across 35 real updates per mode, sampled live allocation fell from 2.100 to 1.292 GB, while median update time rose from 0.31760 to 0.41488 seconds. I retained the option for a future memory-constrained run and left `training.activation_checkpointing = false` for the current model. It already fits, so paying 30.63% more update time would not help this run. See [experiment 04](docs/experiments/04-checkpointing.md).
+
+### Compilation did not win on this workload
+
+The first compiled path produced plausible losses but incorrect gradients. Its learned-position gradient norm was about eight times the eager result at batch size eight. A research-only rewrite of the position lookup reduced the overall relative gradient error to 0.00651, within the BF16 probe tolerance.
+
+That corrected candidate still took 0.33343 seconds per warmed update versus 0.32365 for eager execution, plus a compilation startup cost. I kept eager execution and did not adopt the position-lookup rewrite. The [compile report](docs/experiments/03-compile.md) records the failed attempts, gradient diagnosis and timings. This result concerns the installed Metal compiler and this model; it does not predict CUDA performance.
 
 ## 12. Reproducing the experiment
 
@@ -689,6 +746,7 @@ The strongest next experiment would add legally usable Manas-only text from anot
 - [`docs/RESEARCH_LOG.md`](docs/RESEARCH_LOG.md) records hypotheses, forecasts, failures, and measured outcomes in order.
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) records the decision history and rejected alternatives.
 - [`docs/SOURCES.md`](docs/SOURCES.md) pins data, tokenizer, implementation references, checksums, and licenses.
+- [`docs/experiments/README.md`](docs/experiments/README.md) tracks the optimization series, its individual reports and acceptance criteria.
 - [`reports/results.json`](reports/results.json) contains the machine-readable accepted metrics.
 - [`reports/generation-audits`](reports/generation-audits) contains all fixed raw generations.
 
