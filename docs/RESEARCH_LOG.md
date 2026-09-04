@@ -155,6 +155,15 @@ both halves. This exceeds the maximum 5% slowdown permitted even for a quality
 win. Retain LayerNorm; no full retraining is justified by the preregistered rule.
 See report 07 for memory, provenance and limits. Next: O08 matched-width SwiGLU.
 
+**O08 probe passed; quality pending.** SwiGLU's real-output formula, parameter
+budget, initialization scales and all projection gradients passed. Update median
+0.307848 -> 0.319535 seconds (+3.7962%); sampled allocation 2.254 -> 2.453 GB.
+The unchanged control's first loss and gradient norm exactly reproduce O02 BF16,
+in addition to source/config/data-order checks. Reuse that completed quality
+control and train fresh SwiGLU for the original 3,000-update budget. Require
+independent validation loss <=4.3257791471 and a clean 20-output qualitative
+comparison before promotion. Begin with one retained/resumable 100-update segment.
+
 **O06–O08 execution preparation while 16k trains:** added a shared full-run
 driver with explicit original-random/equal-byte recipes, hashed initial states,
 probe provenance gates and resumable segment checkpoints. RoPE's prepared probe
