@@ -63,6 +63,24 @@ bytes, no replacement characters). [05-tokenizer.md](experiments/05-tokenizer.md
 specifies equal original-text exposure, a fresh 32k control and exact-byte
 validation to prevent shifted splits or unfair token-count comparisons.
 
+**O05 execution preregistration:** `scripts/experiment_tokenizers.py` consumes
+the verified immutable bundle, builds all variants from the same 32k master
+initialization, and trains each for 30 complete text passes. Configuration:
+384 wide, eight layers/heads, context 256, dropout .2, BF16 eager training,
+FP32 evaluation, AdamW (.9,.95), weight decay .1, clipping 1.0, at most two
+8x256 microbatches per update. Loss weights use actual non-padding target counts.
+Warmup covers 1/30 of scored bytes; cosine decay spans the remaining bytes.
+Fresh 32k/16k/8k run sequentially in separate processes; epoch checkpoints
+include optimizer and CPU/MPS RNG state. First verify a real partial window and
+one weighted accumulated MPS update. Forecast: 16k is the likely compromise;
+8k saves more output memory but has shorter raw-text context. Falsifier: no
+>=10% memory/byte-throughput benefit, or validation BPB more than 1% worse than
+either fresh 32k or the incumbent, or raw generation deterioration. Exact-byte
+incumbent evaluation is a safety floor, not a causal tokenizer comparison.
+Command: `.venv/bin/python scripts/experiment_tokenizers.py --output
+runs/optimization-05-tokenizers-20260904`. See O05 report for hashes and all
+controls. No protected test access and no automatic promotion.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,

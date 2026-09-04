@@ -1,7 +1,7 @@
 # 05 — Vocabulary size under an equal original-text budget
 
-Status: preparation verified; **language-model comparison not run**. Execute
-after experiments 02–04. Date: 2026-09-04.
+Status: real training preflight passed; full comparison ready to run.
+O02–O04 decisions are complete. Date: 2026-09-04.
 
 ## Question and forecast
 
@@ -174,7 +174,34 @@ with at most 256 preceding input positions. Unused rows/positions have ignored
 targets, not fabricated supervision. Each update must normalize by its actual
 active-target count, including the final one-microbatch update.
 
-Still required: implement the real training/evaluation driver over these windows,
-verify one real MPS forward/backward including partial-window loss weighting,
-then launch the sequential full comparison after O02–O04. No new tokenizer/model
-has been promoted. No model training for this comparison has started.
+The driver is `scripts/experiment_tokenizers.py`. It launches isolated sequential
+processes for the incumbent evaluation and each fresh model, preventing retained
+allocator caches from contaminating another vocabulary's memory measurement.
+It uses the verified tokenizer explicitly for generation and audits; the original
+32k-only public data/generation entry points remain unchanged. Checkpoints carry
+the tokenizer path/hash and full comparison protocol, not a misleading original
+dataset label. They are research checkpoints pending a promotion decision.
+
+Real 32k MPS preflight passed in `runs/optimization-05-tokenizers-20260904/32768`:
+one full and one genuinely short-containing microbatch had 2048 and 1793 active
+targets. Gradient accumulation weights were 0.53319448 and 0.46680552, rather
+than 0.5 each. The short real sequence contained one input position; its padded
+versus trimmed FP32 logits differed by at most 2.0862e-6 (tolerance 1e-4).
+The ignored-target mean agreed with summed NLL divided by active targets.
+A BF16 training update with dropout .2 produced finite loss 10.49053 and finite
+pre-clipping gradient norm 7.13188. This gate is about numerical correctness,
+not model quality. Each later vocabulary repeats it on its own real windows.
+
+The first preflight selected the last shuffled batch and therefore checked an
+incomplete batch, but not a short input sequence (length remained 256). Inspection
+caught that coverage gap before full training. The runner now explicitly locates
+the true short source window; the successful result above is the corrected gate.
+
+Thirty epoch checkpoints preserve model, optimizer, completed exposure and both
+CPU/MPS RNG states. Only the latest resumable state and best model are retained;
+completed arms are reused only when the full protocol hashes match. A crash can
+repeat the unfinished epoch but never discards already completed epochs. Each
+epoch reports actual training/validation time; sampled memory after forward,
+backward and update is not advertised as an exact allocator peak. Raw generation
+outputs are saved incrementally. No new tokenizer/model has been promoted and
+protected test has not been read.
