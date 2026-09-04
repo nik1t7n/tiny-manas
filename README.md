@@ -47,10 +47,13 @@ On September 4 I froze the original source, configurations, data, tokenizer and 
 | BF16 training | Matched full runs: 1548.04 → 1229.40 s; validation loss change +0.0000464 | Use for 27M training; keep evaluation/inference FP32 |
 | `torch.compile` | Original compiled gradients failed parity; corrected research variant passed but took 3.02% longer per update | Keep eager execution |
 | Activation checkpointing | 38.46% less sampled live allocation; 30.63% longer updates | Offer as an opt-in; leave off for the current model |
+| 32k / 16k / 8k tokenizer | Smaller vocabularies improved training bytes/s by 16.09% / 20.50%, but validation bits/byte worsened by 4.15% / 3.84% versus the incumbent | Keep the original 32k tokenizer and training recipe |
+| RoPE | Mathematical checks passed; median training updates were 12.27% slower | Keep learned positions; no full quality run |
+| RMSNorm | Formula and gradient checks passed; median training updates were 10.71% slower | Keep LayerNorm; no full quality run |
 
 The fresh FP32/BF16 runs both processed 12,288,000 training targets, with the same initialization, batches and schedule. BF16 cut training-loop wall time by 20.58% relative to that fresh FP32 control. Comparing against the older 24.4-minute run would mix precision with conditions from another session. I inspected all 20 fixed BF16 continuations: local epic patterns and the existing repetition problems remain. The speed improvement does not establish better prose.
 
-Vocabulary and architecture experiments are still in progress. I have not selected a smaller tokenizer, RoPE, RMSNorm, SwiGLU, a KV cache or GQA. The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) distinguish completed decisions from candidates. The optimization series has not used the test split for selection or changed the deployed checkpoint.
+The tokenizer, RoPE and RMSNorm decisions are complete. SwiGLU, KV cache and GQA remain under evaluation. The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) distinguish completed decisions from candidates. The optimization series has not used the test split for selection or changed the deployed checkpoint.
 
 ## The complete pipeline
 
@@ -472,7 +475,7 @@ Perplexity is the exponential of mean cross-entropy:
 
 It can be read as the effective number of equally plausible choices left to the model at each position. That intuition is approximate, but lower perplexity still means better next-token prediction under the same tokenizer and dataset.
 
-Perplexity cannot be compared fairly across arbitrary tokenizers because token boundaries change the task. Every candidate here uses the same frozen tokenizer, so the comparison is valid inside this experiment.
+Perplexity cannot be compared fairly across arbitrary tokenizers because token boundaries change the task. The original capacity experiments use the same frozen tokenizer. The later vocabulary experiment instead compares negative log-probability over exactly the same held-out text bytes.
 
 ### Top-1 and top-5 accuracy
 
@@ -692,6 +695,25 @@ Next-token generation needs causal self-attention and an LM head. An encoder, cr
 ### Keep the full tokenizer vocabulary
 
 The full 32,768-token vocabulary lets any output of the pinned tokenizer pass through training and inference. A split-specific compact vocabulary would reduce parameters, but it would add remapping logic and make prompts outside that split unsafe.
+
+I also tested a different, safe way to reduce vocabulary: retain all 256 byte tokens and the first BPE merges from the master tokenizer, giving complete 16k and 8k tokenizers that can still encode arbitrary text. This changes segmentation, not just the output matrix. Smaller tokens mean a longer sequence for the same passage, and a 256-token window then covers fewer text bytes.
+
+To compare them, I retokenized the same chronological text boundaries and scored exactly the same validation bytes after a shared context prefix. All three fresh arms saw 30 passes over the same training text: 87,729,780 scored bytes each. They required different numbers of optimizer updates because their token counts differed. Shared Transformer weights started identically; smaller embedding tables retained the corresponding initial rows. Learning-rate progress followed bytes processed rather than raw update number.
+
+| Vocabulary | Parameters | Validation bits/byte | Training bytes/s | Sampled allocated bytes |
+|---|---:|---:|---:|---:|
+| Accepted 32k checkpoint, rescored | 26,877,696 | **0.876442** | — | — |
+| Fresh 32k control | 26,877,696 | 0.921290 | 82,252.65 | 2,253,916,672 |
+| Fresh 16k | 20,586,240 | 0.912849 | 95,483.53 | 1,805,126,144 |
+| Fresh 8k | 17,440,512 | 0.910118 | 99,114.85 | 1,691,879,936 |
+
+The smaller vocabularies beat the fresh 32k control on both prediction and resources. Neither beat the already accepted model within the allowed 1% prediction-loss increase. The new equal-text training recipe also differed from the incumbent's random windows, so this does **not** isolate vocabulary as the cause of the regression against that incumbent. It rejects these complete candidate recipes under the fixed budget, not smaller tokenizers in general. I retained the existing model instead of replacing it with a faster but worse candidate. All 60 new fixed generations were inspected. With 256 generated tokens each, smaller vocabularies produced fewer text bytes; their lower repetition scores did not establish better narrative coherence. [Experiment 05](docs/experiments/05-tokenizer.md) records the byte boundaries, hashes, budgets and raw-output review.
+
+### Measure architectural substitutions on the target hardware
+
+RoPE encodes position by rotating pairs of Query and Key coordinates before attention. Their dot products then depend on relative position through the difference between rotation angles. The candidate removed the learned position table, saving 98,304 parameters. Norm preservation, a common-position-offset check and causal masking all passed. On this eager MPS implementation, however, median updates increased from 0.30604 to 0.34360 seconds: 12.27%, above the preregistered 10% ceiling. I stopped before full training. This is a cost rejection of the measured implementation, not evidence that RoPE cannot improve language modeling. See [experiment 06](docs/experiments/06-rope.md).
+
+RMSNorm controls scale without subtracting the feature mean. For a token vector, it divides each value by the square root of the mean squared value plus epsilon, then applies a learned feature scale. It has no learned offset in this candidate, removing 6,528 parameters across the 17 normalization layers. The installed native operation matched the explicit FP32 formula and its gradients, but median updates increased from 0.30857 to 0.34160 seconds: 10.71%, above the 5% ceiling. Fewer mathematical operations did not translate into a faster training step on this backend. I retained LayerNorm without claiming a quality comparison that was never run. See [experiment 07](docs/experiments/07-rmsnorm.md).
 
 ### Tie input and output embeddings
 
