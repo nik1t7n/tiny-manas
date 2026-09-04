@@ -44,6 +44,12 @@ settings and identical full training budget/data order. Tensor-match the common
 initialization and use the same initialization distribution for new FFN tensors.
 Use a fresh candidate, not transplanted GELU weights presented as trained SwiGLU.
 
+Keep the accepted checkpoint's sampler and selection recipe, following O06's
+control protocol. Reuse a previous fresh run only with matching initialization
+and exposure. If that control differs from the incumbent, require the declared
+quality gain against both on identical evaluation windows; a weaker fresh
+control must not make a regression look acceptable.
+
 First real-batch check: correct shapes/counts, finite loss, gradients reaching
 gate/up/down, and the intended scaled output initialization. Then synchronized
 whole-update timings and full training. Compare fixed validation targets and

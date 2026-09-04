@@ -58,6 +58,26 @@ same seed is insufficient if removing a module changes random-number consumption
 Preserve old checkpoint loading with an explicit learned-position default; never
 reinterpret old trained parameters as a RoPE checkpoint.
 
+### Select the control protocol before the architectural run
+
+O05 uses a special equal-byte sampler to compare tokenizers. It does not
+automatically replace the training recipe of the accepted checkpoint. If O05
+retains the original 32k incumbent, O06 must retain its original 3,000-update
+random-window recipe, including sampler seeds and validation-selection cadence.
+The completed O02 BF16 run is a reusable control only after verifying identical
+shared initialization, data order, precision, schedule and evaluation windows.
+If O05 promotes a smaller-vocabulary checkpoint, follow its 30-epoch equal-byte
+recipe and use that completed vocabulary arm as the matched control instead.
+Do not compare training recipes and attribute the difference to RoPE.
+
+In either case, evaluate the incumbent on the candidate's final evaluation
+windows and retain it as a quality floor. A fresh control that underperforms the
+incumbent cannot lower the bar for promotion. Require the stated quality gain
+against both whenever the fresh control and incumbent differ. Save the exact
+candidate initialization with its configuration and hash before full training;
+later architecture comparisons can reuse those tensors without relying on a
+seed that may consume a different random-number sequence after module changes.
+
 ## Correctness and acceptance
 
 Before training, use Q/K from real corpus inputs to verify pairwise norm

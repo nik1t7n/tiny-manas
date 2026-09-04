@@ -40,6 +40,12 @@ Reuse the accepted control's evidence only if those exact conditions match.
 Do not replace normalization inside trained weights and call its immediate loss
 a fair training comparison.
 
+Follow the accepted checkpoint's training recipe as specified in O06's control
+protocol: the temporary tokenizer-comparison sampler does not override an
+incumbent trained with random windows. Preserve a hashed fresh initialization
+for each trained architecture. If a fresh control differs from the incumbent,
+apply the quality limits below against both on identical evaluation windows.
+
 First compare the implementation's outputs and input/scale gradients with the
 explicit formula on real residual activations. Then check a real training batch
 for finite loss and gradients. Measure synchronized warmed whole updates, not

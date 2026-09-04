@@ -96,6 +96,15 @@ memory/cost question and explicit backend/numerical gates in
 [11-output-loss.md](experiments/11-output-loss.md). Current BF16 training fits;
 reassess after final architecture selection before spending another GPU run.
 
+**Architecture control clarification before O06–O08:** the equal-byte tokenizer
+sampler is an O05 comparison tool, not an automatically accepted training change.
+Later architectural candidates follow the accepted checkpoint's recipe. If 32k
+incumbent remains selected, keep its original random-window/3000-update protocol;
+if a smaller O05 model wins, keep its equal-byte/30-epoch protocol. Reuse a prior
+control only after checking initialization and all training/evaluation inputs.
+The current incumbent remains a separate quality floor if a fresh control is
+weaker. This prevents a new sampler's regression from lowering acceptance bars.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,
