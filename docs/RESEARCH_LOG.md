@@ -81,6 +81,14 @@ Command: `.venv/bin/python scripts/experiment_tokenizers.py --output
 runs/optimization-05-tokenizers-20260904`. See O05 report for hashes and all
 controls. No protected test access and no automatic promotion.
 
+**O05 started:** real 32k padded-window update passed, then the sequential
+controller launched from `c7cfeff` into `runs/optimization-05-tokenizers-20260904`.
+Incumbent exact-byte validation is 0.8764423051 BPB / 4.2968102825 mean token
+loss on the declared windows; this is not comparable to the old random-window
+loss as a weight improvement. Fresh 32k training is active. Use process liveness
+plus per-arm `history.json`/`result.json`; do not start duplicate training.
+O06's isolated candidate/probe is prepared and CLI-parsed only, not GPU-verified.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,

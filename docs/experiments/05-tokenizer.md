@@ -1,6 +1,6 @@
 # 05 — Vocabulary size under an equal original-text budget
 
-Status: real training preflight passed; full comparison ready to run.
+Status: real training preflight passed; full sequential comparison running.
 O02–O04 decisions are complete. Date: 2026-09-04.
 
 ## Question and forecast
@@ -205,3 +205,22 @@ epoch reports actual training/validation time; sampled memory after forward,
 backward and update is not advertised as an exact allocator peak. Raw generation
 outputs are saved incrementally. No new tokenizer/model has been promoted and
 protected test has not been read.
+
+## Active execution and recovery
+
+The controller is running `runs/optimization-05-tokenizers-20260904` from
+implementation commit `c7cfeff`. It evaluates the incumbent, trains 32k for
+30 epochs, evaluates/audits its best checkpoint, and then repeats for 16k and 8k.
+No next experiment may use the GPU until this controller finishes or fails.
+Check the live process before reissuing the command; do not run a second copy.
+Each vocabulary's `history.json` reports completed epochs and `resume.pt`
+retains that exact epoch's continuation state. `result.json` appears only after
+full training, independent validation and all 20 generation audits finish.
+
+The incumbent's exact-byte FP32 validation is **0.8764423051 bits/byte**:
+summed NLL 99,849.27734375 across 23,238 targets / 164,360 original bytes,
+equivalent to mean token loss 4.2968102825 under these particular windows.
+This is a different evaluation protocol from the earlier random-batch 4.3457791;
+the difference is not an improvement in model weights. The incumbent checkpoint
+and tokenizer hashes match the accepted-state record. Artifact:
+`runs/optimization-05-tokenizers-20260904/incumbent/result.json`.
