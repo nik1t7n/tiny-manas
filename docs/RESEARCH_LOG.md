@@ -50,6 +50,9 @@ handling and recorded a concrete dropout-preservation risk in
 [04-checkpointing.md](experiments/04-checkpointing.md). The first runtime check
 must include dropout 0.2, gradients and post-backward RNG state; eval-only parity
 would not establish correctness. Defer execution until O02/O03 decisions.
+Prepared `scripts/experiment_checkpointing.py` for the standard eager path;
+only CLI parsing was run while O02 owns the GPU. Correctness failure stops it
+before timing, and any accepted compile mode must be included explicitly later.
 
 **O05 preparation (not executed):** found the owner's existing nested 8k/16k/32k
 v1 tokenizers. Verified all three tokenizer hashes and the eight original

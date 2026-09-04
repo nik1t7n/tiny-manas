@@ -63,6 +63,23 @@ default remains unchanged on this already-fitting model. If it does not, do
 not introduce a production switch merely because the mechanism is fashionable.
 Larger batch or context is a later, separately controlled experiment.
 
+## Prepared runner
+
+`scripts/experiment_checkpointing.py --checkpoint PATH --precision fp32|bf16`
+first compares one real dropout-enabled training batch, including gradients,
+the first AdamW update and CPU/MPS random states. Parameter-update maximum error
+must also be <=1e-6. A failure is saved and stops the run before timing. If it
+passes, each mode runs 35 identical two-microbatch updates, excluding five warmup
+updates. Models are loaded/released sequentially so one mode's live model and
+optimizer do not inflate the other's allocator measurement.
+
+The prepared runner currently measures eager execution with standard PyTorch
+RNG preservation only. Its CLI was checked; no GPU checkpointing experiment has
+run. If experiment 03 accepts compilation, extend this runner to the actual
+accepted execution mode before starting, rather than claiming compiled coverage
+from an eager check. If standard MPS RNG preservation fails, record that real
+failure before implementing and measuring an explicit fix.
+
 ## Source
 
 [PyTorch checkpoint documentation](https://docs.pytorch.org/docs/2.13/checkpoint.html)
