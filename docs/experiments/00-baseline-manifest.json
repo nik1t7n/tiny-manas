@@ -1,0 +1,86 @@
+{
+  "source_revision": "4ad408ecb327832ea855f392d35ed123638cbd87",
+  "snapshot": "/Users/nik1t7n/Projects/learning/manas-gpt/runs/frozen-baseline-20260904",
+  "source_archive_sha256": "4061b1fc30ab5fa9abd2c21475938ad0d08fe06b41267dd7d24db39a93f93f55",
+  "environment": {
+    "python": "3.13.11 (main, Jan 14 2026, 23:14:53) [Clang 21.1.4 ]",
+    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "torch": "2.13.0",
+    "device": "mps",
+    "mps_built": true,
+    "mps_available": true,
+    "mps_recommended_max_memory_bytes": 12713115648,
+    "git_commit": "4ad408ecb327832ea855f392d35ed123638cbd87"
+  },
+  "files": {
+    "artifacts/tiny-manas-27m.pt": {
+      "sha256": "cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1",
+      "bytes": 107546203
+    },
+    "data/processed/manas01-full/epic.txt": {
+      "sha256": "b3bd8707d49074283fa10b3a91f65147a47ba034c1a30c001fad082f95d6f2a4",
+      "bytes": 3249652
+    },
+    "data/processed/manas01-full/metadata.json": {
+      "sha256": "206a9a0708e9257b5d21f8798549be271e59b2009a27b4de42f99c59dcd8c4f9",
+      "bytes": 2090
+    },
+    "data/processed/manas01-full/test.bin": {
+      "sha256": "b9e346baf9c9962263784c193529a5d86dd0b86d035b1dc33cc8f0323d9020b0",
+      "bytes": 46508
+    },
+    "data/processed/manas01-full/train.bin": {
+      "sha256": "b9c7ee479b44370c756afb50006e97c253dc38722ec7ad1b72bc5cf011a5c581",
+      "bytes": 837124
+    },
+    "data/processed/manas01-full/validation.bin": {
+      "sha256": "da0c05b10271aafb0632e9fd4463a7b9e975267865c8f08869de2f21de58dcd3",
+      "bytes": 46506
+    },
+    "data/tokenizer/kyrgyz-byte-bpe-v1.json": {
+      "sha256": "5047b4f427bb1af1c06cfb9cefbe83790b56df409b137b887988db6eba4b159f",
+      "bytes": 3471130
+    },
+    "runs/manas01-27m-20260831T160739Z/architecture.json": {
+      "sha256": "c5e9ad0cd44175ff4a61bc9afe21d3edd665f0a7e83d6da042369d5d0a362f20",
+      "bytes": 204
+    },
+    "runs/manas01-27m-20260831T160739Z/best-model.pt": {
+      "sha256": "ddeeb5572c5a7ccde653320bdbe799cca0a4c5a2c48e451962d0c8877e3f3f75",
+      "bytes": 372982951
+    },
+    "runs/manas01-27m-20260831T160739Z/config.toml": {
+      "sha256": "a3cb68e4a8001fd00fc5568bd789e271eb0bea864f5888d65326ab326ae6ecad",
+      "bytes": 699
+    },
+    "runs/manas01-27m-20260831T160739Z/environment.json": {
+      "sha256": "951315d2035a9d4c10a1bcd7ff29cd0b8d92ad1e212871a650ff5a5022090276",
+      "bytes": 322
+    },
+    "runs/manas01-27m-20260831T160739Z/final-model.pt": {
+      "sha256": "5ba2e5c55146f66066f1ba4af949c122f2c02b72b8e9d1c702723e43c8c90c81",
+      "bytes": 372983358
+    },
+    "runs/manas01-27m-20260831T160739Z/generation-audit.json": {
+      "sha256": "81b8db4adc2078018cc30cd6b39f97d9a3cbd78d705ae97a22136425dc098836",
+      "bytes": 155367
+    },
+    "runs/manas01-27m-20260831T160739Z/generation-final.json": {
+      "sha256": "dd819771b219a31e82bffe9b40d97412c5510f2ce5b4982e4769d2889b0ca56f",
+      "bytes": 4324
+    },
+    "runs/manas01-27m-20260831T160739Z/generation-initial.json": {
+      "sha256": "bccd2f2fdff07ddc374758ffa86ce6f5557e3d67bd094d3689fa628d95de7646",
+      "bytes": 2098
+    },
+    "runs/manas01-27m-20260831T160739Z/metrics.jsonl": {
+      "sha256": "7a3b3abda557efe76a0a650187bcc9ef2d1f4e84416012cc1677ec64453df5da",
+      "bytes": 57296
+    },
+    "runs/manas01-27m-20260831T160739Z/summary.json": {
+      "sha256": "ff5ab2d7fc6c684153b4fbf9bce0915e0496c7f2db413658fb2c432b86db34a6",
+      "bytes": 7748
+    }
+  },
+  "policy": "Read-only copies; never use this directory as experiment output. Source archive includes original README, configs, docs and implementation. No corpus/checkpoint content committed."
+}

@@ -2,6 +2,21 @@
 
 Forecasts are written before each run. Failed runs and wrong predictions remain in chronological order.
 
+## Optimization series — 2026-09-04
+
+The owner authorized sequential implementation, individual experiment reports,
+measured promotion and an eventual updated README. The original revision
+`4ad408e` and 17 real artifact files were copied and SHA-256 verified before
+model edits. See [frozen baseline](experiments/00-baseline.md).
+
+**O01 preregistration:** question, forecast, falsifier and controls are in
+[01-last-position.md](experiments/01-last-position.md). Changed variable:
+project only the last position when generation explicitly requests it.
+Original model/checkpoint/tokenizer/FP32/MPS remain fixed. Evaluate identical
+real validation inputs with no test access. Synchronized interleaved warmed
+timings, numerical tolerance 1e-4, and greedy continuations gate acceptance.
+Run command: `.venv/bin/python scripts/experiment_last_position.py`.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31
