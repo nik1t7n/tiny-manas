@@ -16,10 +16,10 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 - [ ] 04 — Activation checkpointing, unchanged batch and context first.
 - [ ] 05 — 32k / 16k / 8k tokenizer comparison on fixed original-text splits.
 - [ ] 06 — RoPE versus learned positions. [Preregistered](06-rope.md); context and cache-boundary semantics remain explicit.
-- [ ] 07 — RMSNorm versus LayerNorm.
-- [ ] 08 — SwiGLU versus parameter-matched GELU FFN.
-- [ ] 09 — KV cache with separate prefill/decode on the accepted MHA checkpoint.
-- [ ] 10 — GQA versus MHA, including quality and actual cache storage.
+- [ ] 07 — RMSNorm versus LayerNorm. [Preregistered](07-rmsnorm.md).
+- [ ] 08 — SwiGLU versus parameter-matched GELU FFN. [Preregistered](08-swiglu.md).
+- [ ] 09 — KV cache with separate prefill/decode on the accepted MHA checkpoint. [Preregistered](09-kv-cache.md).
+- [ ] 10 — GQA versus MHA, including quality and actual cache storage. [Preregistered bounded adaptation](10-gqa.md).
 - [ ] 11 — Fused/chunked output loss, conditional on measured output-memory pressure.
 - [ ] Final — Inspect 20 raw generations and memorization for accepted trained models;
   evaluate protected test only after selection; update technical README with measured results.

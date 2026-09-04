@@ -71,6 +71,22 @@ tensor-matched despite module changes. The later KV cache must preserve cropped
 window semantics at overflow; relative positions do not erase old contextual
 information already embedded in cached deeper-layer states.
 
+**O07–O10 preparation (not executed):** read original RMSNorm, GLU-variant and
+GQA methods while O02 trains. Registered exact comparison/acceptance contracts
+in their separate reports. RMSNorm must demonstrate a whole-update benefit, not
+borrow another framework's speedup. SwiGLU width 1024 matches the old FFN's matrix
+weight budget; the 4096 extra bias parameters are disclosed. KV-cache parity
+includes overflow and explicit cropped-window rebuilding. GQA uses the paper's
+mean-pooling conversion followed by 150 matched adaptation updates in each of
+GQA/MHA, avoiding an unnecessary fresh full pretraining run. A failed bounded
+adaptation is a negative result, not permission to extend compute indefinitely.
+
+**O02 control complete:** FP32 finished 3000 updates in 1548.042 seconds;
+independent validation 4.345732722 reproduces the original result. All 20 token
+sequences match the frozen audit. All continuations were read and re-audited
+under word-match protocol 2 (maximum 9, mean trigram repetition 0.0421294).
+BF16 is now training automatically; no precision promotion yet.
+
 **Measurement correction:** source inspection and real saved generations found
 asymmetric normalization in the copying audit. Nine of the original 20 samples
 were undercounted; normalized longest match is nine words rather than seven.

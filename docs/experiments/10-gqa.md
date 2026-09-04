@@ -1,0 +1,52 @@
+# 10 — Grouped-query attention after a correct KV cache
+
+Status: preregistered, **not run**. Follow O09. Date: 2026-09-04.
+
+## Question and forecast
+
+Can eight query heads share two KV heads without losing useful prediction
+quality? Each group of four queries reads one K/V pair. Query count, head width
+48, residual width 384 and eight layers stay fixed. This does not divide all
+attention work by four: there are still eight query heads and their scores.
+
+For the O09 B=1,T=256 FP32 example, persistent KV storage falls from 6 MiB to
+1.5 MiB. Measure storage, not merely tensor views, and separately measure any
+temporary expansion of K/V required by the MPS attention implementation. The
+absolute cache saving is modest on this small short-context model.
+
+Projection parameters also fall: the combined QKV output shrinks from 1152 to
+576 features, saving 221,760 parameters per layer with biases, or 1,774,080 total.
+Do not increase another module to compensate; the question is the actual
+quality/resource tradeoff of sharing KV projections.
+
+Forecast: definite persistent cache reduction if implemented correctly, uncertain
+wall-time improvement, and possible quality loss. Larger-model CUDA results do
+not predict this M5 workload.
+
+## Bounded adaptation comparison
+
+Use the [GQA paper's section 2](https://arxiv.org/html/2305.13245v3#S2) as a
+conversion recipe: mean-pool K and V projection rows within each group of four
+heads, including biases. Preserve Q and all other weights. Pool K before applying
+any rotary position transformation. Save a distinct checkpoint/config; never
+overwrite or reinterpret the MHA checkpoint.
+
+First verify the eight-KV configuration reproduces the existing MHA path on real
+inputs, then verify the two-KV candidate's cached/uncached parity, finite
+gradients and actual cache storage. Shape correctness is not a quality result.
+
+Adapt converted GQA and an unchanged MHA control from the same accepted checkpoint
+for 150 optimizer updates each, with identical real windows, seed, precision,
+batch, accumulation and optimizer settings. This is an explicit 5%-of-3000-step
+adaptation experiment, not fresh pretraining or a promise that 5% is sufficient.
+Use fresh optimizer states in both arms and constant learning rate 0.00003.
+Evaluate before and after on identical validation targets; record both candidate
+versus adapted control and candidate versus original accepted checkpoint.
+
+Inspect 20 raw continuations with the version-2 copying audit. Accept only if
+validation is no worse than either reference by 0.05 nats, no obvious new output
+collapse occurs, actual persistent cache saving is >=60%, and warmed decode
+latency regresses by no more than 5%. Report that acceptance may be primarily a
+memory tradeoff, not a speed win. If this bounded adaptation fails, retain MHA;
+do not keep extending training until a favorable result appears without a new
+explicitly recorded hypothesis and budget.
