@@ -3,8 +3,9 @@
 ## Authorization and scope
 
 On 2026-09-04 the owner authorized implementation and measured experiments,
-superseding the earlier planning-only state. Work stays local: no deployment,
-paid compute, new datasets, or publication is implied. The original reference
+superseding the earlier planning-only state. Later the same day the owner
+explicitly authorized pushing the completed changes and deploying the accepted
+result to the existing service. No paid compute or new dataset is needed. The original reference
 must remain recoverable. Changes are accepted individually, not as an unmeasured bundle.
 
 ## Checklist
@@ -27,6 +28,9 @@ started. See [pause and recovery history](PAUSED.md).
 - [ ] 11 — Fused/chunked output loss, conditional on measured output-memory pressure. [Source review and gates](11-output-loss.md); distinguish the Triton kernel from the macOS compile implementation.
 - [ ] Final — Inspect 20 raw generations and memorization for accepted trained models;
   evaluate protected test only after selection; update technical README with measured results.
+- [ ] Release — Push the completed changes; deploy the accepted checkpoint and
+  code to the existing private Tiny Manas service; verify public generation and
+  preserve the previous image/checkpoint for rollback.
 
 ## Decision protocol
 
