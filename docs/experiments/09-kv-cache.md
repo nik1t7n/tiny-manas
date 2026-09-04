@@ -3,6 +3,20 @@
 Status: preregistered, **not run**. Use the accepted MHA checkpoint after O08.
 Date: 2026-09-04.
 
+Prepared while O05 trains: `scripts/kv_cache_candidate.py` provides a separate
+request-local `CacheSession` and cached generation loop. It reuses the selected
+model's actual projections, norms and FFNs; no alternate trained weights or
+synthetic input path is introduced. It is not integrated into ordinary generation
+and has not run on MPS. Candidate preparation is not a passed equivalence gate.
+The initial candidate uses dynamic concatenation, owns separate contiguous K/V
+storage, and reports unique storage bytes as well as logical tensor bytes. It
+does not claim preallocation/fused decoding benefits that it does not implement.
+
+The installed-version [SDPA documentation](https://docs.pytorch.org/docs/2.13/generated/torch.nn.functional.scaled_dot_product_attention.html)
+defines the causal mask as upper-left aligned. The candidate therefore uses
+causal attention during prompt prefill and no causal mask for a single new query
+over exclusively past/current keys. It rejects multi-token decode appends.
+
 ## Question and contract
 
 Can we avoid recomputing old tokens without changing what the model predicts?

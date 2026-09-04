@@ -128,6 +128,14 @@ The RMSNorm gate checks input/scale gradients as well as outputs; SwiGLU checks
 its formula, initialization budget and projection gradients. CLI parsing passed;
 these are prepared checks, not results from the GPU.
 
+**O09 source preparation while O05 owns the GPU:** added an isolated request-local
+cache candidate. The ordinary model/generation path is unchanged. Prefill is
+causal; single-token decode reads all past/current keys without an incorrectly
+aligned rectangular mask. Overflow explicitly rebuilds the cropped window.
+Dynamic cache tensors own their storage, which will be measured separately from
+logical bytes. Read the PyTorch 2.13 SDPA mask semantics through Context7. No
+cached inference, parity result or speed measurement is claimed yet.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,
