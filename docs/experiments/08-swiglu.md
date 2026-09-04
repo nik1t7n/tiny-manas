@@ -125,3 +125,32 @@ The full runner reports training-only time separately from evaluation/checkpoint
 overhead. Do not compare that narrower timing field against O02's entire training
 loop and call the difference a SwiGLU speed gain. The controlled 35-update probe
 is the architectural cost comparison; full training determines quality.
+
+## Conditional production integration, not yet authorized by the result
+
+Read-only tracing of `ModelConfig`, construction, checkpoint loading/export and
+the service identified the adoption boundary. The current research checkpoint
+is not an ordinary GELU checkpoint: its FFN keys/shapes and protocol explicitly
+describe SwiGLU. Do not feed it to an unchanged public loader and conceal that
+incompatibility. No service deployment is part of this experiment.
+
+If the quality gate passes, add an explicit `ffn_type` with a legacy `gelu`
+default; old checkpoint configurations must keep their original interpretation.
+Native SwiGLU must retain the gate/up/down parameter names, compensated hidden
+width and scaled output initialization used in the measured candidate.
+
+Reproducibility needs more than adding a branch in the block constructor. That
+would change random-number consumption for later shared attention weights.
+The controlled run first constructed the classic model, then replaced FFNs with
+a separate seed-1337 generator. Preserve this initialization ordering for the
+reproduction config (deriving the FFN generator from the run seed), and verify
+the resulting initial tensors against the saved candidate initializer. Loading
+trained weights must then reproduce candidate logits through the native path.
+
+Create a distinct promoted checkpoint, preserving the original research artifact
+and original GELU checkpoint. Give the promoted artifact an explicit resolved
+model configuration and retain the actual source protocol/config hash as research
+provenance; do not pretend the original TOML already contained the new flag.
+The existing shared load/generate/export path must handle it correctly before
+updating accepted state. If quality fails, none of this native integration is
+needed; retain the isolated candidate and negative report.
