@@ -60,6 +60,14 @@ bytes, no replacement characters). [05-tokenizer.md](experiments/05-tokenizer.md
 specifies equal original-text exposure, a fresh 32k control and exact-byte
 validation to prevent shifted splits or unfair token-count comparisons.
 
+**O06 preparation (not executed):** read RoFormer's rotation construction and
+registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
+fresh matched models after tokenizer selection. Require a measured quality gain,
+not merely removal of the small position table. Shared initialization must be
+tensor-matched despite module changes. The later KV cache must preserve cropped
+window semantics at overflow; relative positions do not erase old contextual
+information already embedded in cached deeper-layer states.
+
 **Measurement correction:** source inspection and real saved generations found
 asymmetric normalization in the copying audit. Nine of the original 20 samples
 were undercounted; normalized longest match is nine words rather than seven.

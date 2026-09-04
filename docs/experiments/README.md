@@ -15,7 +15,7 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 - [ ] 03 — `torch.compile` and fusion on the winning precision mode.
 - [ ] 04 — Activation checkpointing, unchanged batch and context first.
 - [ ] 05 — 32k / 16k / 8k tokenizer comparison on fixed original-text splits.
-- [ ] 06 — RoPE versus learned positions.
+- [ ] 06 — RoPE versus learned positions. [Preregistered](06-rope.md); context and cache-boundary semantics remain explicit.
 - [ ] 07 — RMSNorm versus LayerNorm.
 - [ ] 08 — SwiGLU versus parameter-matched GELU FFN.
 - [ ] 09 — KV cache with separate prefill/decode on the accepted MHA checkpoint.
