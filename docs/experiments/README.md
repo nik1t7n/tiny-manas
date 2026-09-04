@@ -11,7 +11,7 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 
 - [x] 00 — Freeze original code, architecture, configs, data, tokenizer, checkpoint and evidence. See [baseline](00-baseline.md) and [verified manifest](00-baseline-manifest.json).
 - [x] 01 — Last-position output projection during generation. [Accepted](01-last-position.md): parity passed, 1.24x model-forward speed at B=1,T=256; 256x smaller output tensor.
-- [ ] 02 — BF16 mixed precision. [100-step probe passed; full FP32/BF16 pair running](02-bf16.md). Default training remains FP32 pending the quality gate.
+- [x] 02 — BF16 mixed precision. [Accepted](02-bf16.md): 20.58% shorter full training, validation +0.0000464 nats, all 20 outputs reviewed. 27M training uses BF16; inference remains FP32.
 - [ ] 03 — `torch.compile` and fusion on the winning precision mode.
 - [ ] 04 — Activation checkpointing, unchanged batch and context first.
 - [ ] 05 — 32k / 16k / 8k tokenizer comparison on fixed original-text splits.

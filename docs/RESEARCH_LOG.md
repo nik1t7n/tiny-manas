@@ -87,6 +87,15 @@ sequences match the frozen audit. All continuations were read and re-audited
 under word-match protocol 2 (maximum 9, mean trigram repetition 0.0421294).
 BF16 is now training automatically; no precision promotion yet.
 
+**O02 full result:** both arms completed. BF16 took 1229.405 versus 1548.042
+seconds (-20.58%), independent validation 4.345779147 versus 4.345732722.
+All 20 BF16 continuations were read and re-audited (maximum normalized match 9;
+mean repeated-trigram ratio 0.0409729). Individual repetition regressions remain
+visible, especially samples 14/17; no prose-quality improvement is claimed.
+Accept training autocast BF16, keep parameters/AdamW/evaluation/inference FP32,
+preserve original weights. Explicit selected checkpoint/hash and current settings
+are in [accepted state](experiments/accepted-state.json). Next: compile probe.
+
 **O05 promotion-gate correction before execution:** the fresh 32k run controls
 the tokenizer comparison but could itself underperform our incumbent because
 the equal-text sampler is new. Added exact-byte evaluation of the incumbent as

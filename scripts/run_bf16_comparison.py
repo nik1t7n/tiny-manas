@@ -4,6 +4,7 @@ from pathlib import Path
 import gc
 import hashlib
 import json
+import tarfile
 import traceback
 
 import torch
@@ -36,7 +37,16 @@ def main():
     save()
     print(f"COMPARISON {destination}", flush=True)
     try:
-        original = (ROOT / "configs/manas01-27m.toml").read_text()
+        # Later accepted defaults must not change this experiment's control.
+        archive_path = ROOT / "runs/frozen-baseline-20260904/source.tar"
+        expected_archive = manifest["source_archive_sha256"]
+        if hashlib.sha256(archive_path.read_bytes()).hexdigest() != expected_archive:
+            raise RuntimeError("Frozen source archive hash mismatch")
+        with tarfile.open(archive_path) as archive:
+            member = archive.extractfile("configs/manas01-27m.toml")
+            if member is None:
+                raise RuntimeError("Original config is missing from the frozen source archive")
+            original = member.read().decode("utf-8")
         for precision in ("fp32", "bf16"):
             config_path = destination / f"{precision}.toml"
             text = original.replace('name = "manas01-27m"', f'name = "optimization-02-{precision}"')

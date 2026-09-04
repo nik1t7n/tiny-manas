@@ -20,6 +20,7 @@ bias = true
 tie_embeddings = true
 
 [training]
+precision = "bf16"
 batch_size = 8
 gradient_accumulation_steps = 2
 max_steps = 3000

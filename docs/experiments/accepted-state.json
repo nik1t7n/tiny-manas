@@ -1,0 +1,18 @@
+{
+  "updated": "2026-09-04",
+  "frozen_baseline_tag": "tiny-manas-pre-optimization-20260904",
+  "accepted_experiments": ["01-last-position", "02-bf16"],
+  "training_precision": "bf16",
+  "execution": "eager",
+  "inference_precision": "fp32",
+  "training_config": "configs/manas01-27m.toml",
+  "checkpoint": "runs/optimization-02-bf16-20260904T055741Z/best-model.pt",
+  "checkpoint_sha256": "31499eb747c98bcada1c48b12205033cded96573269bc15464ccafd9905e2167",
+  "tokenizer_sha256": "5047b4f427bb1af1c06cfb9cefbe83790b56df409b137b887988db6eba4b159f",
+  "validation_loss": 4.345779147148132,
+  "validation_protocol": "100 original random validation batches, seed 1837, FP32 evaluation",
+  "test_evaluated_during_selection": false,
+  "deployed": false,
+  "original_checkpoint_preserved": true,
+  "next_experiment": "03-compile"
+}
