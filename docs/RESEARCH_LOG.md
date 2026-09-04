@@ -23,6 +23,21 @@ Run command: `.venv/bin/python scripts/experiment_last_position.py`.
 the context boundary. T=1 was slightly slower and receives no savings. See the
 individual report for complete measurements and limits. Next: BF16 training probe.
 
+**O02 preregistration:** [BF16 report](experiments/02-bf16.md). Run 100 updates
+each of FP32 and autocast BF16 from the same seed with real train windows,
+original configuration and 32 fixed validation batches. Only precision changes.
+Forecast finite training, validation within 0.1 nats, >=5% timing or >=10%
+sampled-memory benefit. This is only a probe; passing requires a later full
+paired run before promotion. Command: `.venv/bin/python scripts/experiment_bf16.py`.
+
+**O02 probe result:** 100+100 real updates completed. Median FP32/BF16 step
+0.514812/0.352698 seconds; validation 7.135342/7.135239. Sampled allocated memory
+2.298/2.251 GB; driver memory slightly increased. Accept proceeding, not BF16
+promotion. Full preregistration is in the report: two fresh 3000-step runs,
+identical data/schedule, early stopping disabled in both, validation selection
+and 20-sample audit. Test untouched; tolerance +0.05 nats and >=5% speed benefit.
+Command: `.venv/bin/python scripts/run_bf16_comparison.py`.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31

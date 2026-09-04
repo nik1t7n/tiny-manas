@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
+from contextlib import nullcontext
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -240,6 +241,9 @@ def train(config_path: str | Path) -> dict[str, Any]:
     vocab_size = int(metadata["tokenizer"]["vocab_size"])
     model_config = config.model.with_vocab_size(vocab_size)
     model = ManasGPT(model_config).to(device)
+    autocast = (
+        lambda: torch.autocast("mps", dtype=torch.bfloat16)
+    ) if config.training.precision == "bf16" else nullcontext
     optimizer = model.configure_optimizer(
         learning_rate=config.training.learning_rate,
         weight_decay=config.training.weight_decay,
@@ -325,7 +329,8 @@ def train(config_path: str | Path) -> dict[str, Any]:
         accumulated_loss = 0.0
         for _ in range(config.training.gradient_accumulation_steps):
             x, y = train_sampler.next(device)
-            _, loss = model(x, y)
+            with autocast():
+                _, loss = model(x, y)
             if loss is None:
                 raise RuntimeError("Training loss was unexpectedly None")
             if not torch.isfinite(loss):
