@@ -9,9 +9,9 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 
 ## Checklist
 
-**Paused by the owner on 2026-09-04. No experiment may resume or start until
-the owner explicitly asks.** O08 stopped with a saved 2,500-update checkpoint;
-O09/O10 have not started. See [pause and recovery](PAUSED.md).
+**Resumed by explicit owner instruction on 2026-09-04.** O08 resumes its saved
+2,500-update checkpoint; completed work is not repeated. O09/O10 have not yet
+started. See [pause and recovery history](PAUSED.md).
 
 - [x] 00 — Freeze original code, architecture, configs, data, tokenizer, checkpoint and evidence. See [baseline](00-baseline.md) and [verified manifest](00-baseline-manifest.json).
 - [x] 01 — Last-position output projection during generation. [Accepted](01-last-position.md): parity passed, 1.24x model-forward speed at B=1,T=256; 256x smaller output tensor.

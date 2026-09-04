@@ -1,5 +1,10 @@
 # Owner-requested stop — 2026-09-04
 
+**Superseded later the same day:** the owner explicitly said to continue to the
+end. Resume from the saved 2,500-update checkpoint, retaining the original
+experiment budgets and decision gates. The account below documents the stop;
+it is no longer an active prohibition.
+
 The owner explicitly requested an immediate stop. Do not resume training,
 evaluation, generation audits, KV-cache or GQA experiments automatically.
 Continue only after a new explicit owner instruction.
