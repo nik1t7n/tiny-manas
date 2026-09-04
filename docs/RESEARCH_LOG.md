@@ -38,6 +38,13 @@ identical data/schedule, early stopping disabled in both, validation selection
 and 20-sample audit. Test untouched; tolerance +0.05 nats and >=5% speed benefit.
 Command: `.venv/bin/python scripts/run_bf16_comparison.py`.
 
+**O03 preparation (not executed):** while the real O02 process remains alive,
+inspect the installed Inductor Metal backend and preregister the compile probe
+in [03-compile.md](experiments/03-compile.md). The prepared runner requires the
+eventual accepted checkpoint and precision explicitly. No concurrent GPU run,
+production compile switch, or assumed BF16 promotion. Require loss/gradient
+parity, >=5% warmed update benefit and cold-cost amortization within 3000 updates.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31
