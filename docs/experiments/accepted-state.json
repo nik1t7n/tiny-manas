@@ -16,10 +16,10 @@
   "test_evaluated_during_selection": false,
   "deployed": false,
   "original_checkpoint_preserved": true,
-  "rejected_experiments": ["03-compile"],
-  "next_experiment": "05-tokenizer",
+  "rejected_experiments": ["03-compile", "05-tokenizer"],
+  "next_experiment": "06-rope",
   "tokenizer_comparison_data": "runs/optimization-05-data-20260904T060626Z",
   "tokenizer_comparison_run": "runs/optimization-05-tokenizers-20260904",
-  "tokenizer_comparison_status": "running_not_selected",
+  "tokenizer_comparison_status": "completed_keep_incumbent_32768",
   "tokenizer_comparison_manifest_sha256": "7120ded73b026720bef09797c9ae9d81d261ff7012ab680bc12b3e6aa1231001"
 }

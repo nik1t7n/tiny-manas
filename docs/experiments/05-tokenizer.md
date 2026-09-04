@@ -1,7 +1,7 @@
 # 05 — Vocabulary size under an equal original-text budget
 
-Status: real training preflight passed; full sequential comparison running.
-O02–O04 decisions are complete. Date: 2026-09-04.
+Status: **completed; retain the incumbent 32k tokenizer/checkpoint**. Both smaller
+vocabularies fail the incumbent quality floor. Date: 2026-09-04.
 
 ## Question and forecast
 
@@ -153,9 +153,9 @@ the learning-rate progress, without independently decoding partial UTF-8 tokens
 and accidentally counting replacement characters. The implementation must
 assert that equality when preparing the immutable artifacts.
 
-## Remaining execution work
+## Execution setup and preflight
 
-Prepared, not trained: `runs/optimization-05-data-20260904T060626Z`.
+Frozen comparison inputs: `runs/optimization-05-data-20260904T060626Z`.
 Manifest SHA-256: `7120ded73b026720bef09797c9ae9d81d261ff7012ab680bc12b3e6aa1231001`.
 Command: `.venv/bin/python scripts/prepare_tokenizer_comparison.py`.
 The script verifies frozen train/validation hashes and all three tokenizer
@@ -206,13 +206,14 @@ backward and update is not advertised as an exact allocator peak. Raw generation
 outputs are saved incrementally. No new tokenizer/model has been promoted and
 protected test has not been read.
 
-## Active execution and recovery
+## Execution and recovery
 
-The controller is running `runs/optimization-05-tokenizers-20260904` from
+The controller completed `runs/optimization-05-tokenizers-20260904` from
 implementation commit `c7cfeff`. It evaluates the incumbent, trains 32k for
 30 epochs, evaluates/audits its best checkpoint, and then repeats for 16k and 8k.
-No next experiment may use the GPU until this controller finishes or fails.
-Check the live process before reissuing the command; do not run a second copy.
+It exited successfully after all three models and their audits. During execution,
+no next experiment used the GPU. Do not rerun these completed arms merely to
+refresh a timestamp or recover the report; the recorded artifacts remain valid.
 Each vocabulary's `history.json` reports completed epochs and `resume.pt`
 retains that exact epoch's continuation state. `result.json` appears only after
 full training, independent validation and all 20 generation audits finish.
@@ -373,9 +374,74 @@ Artifact: `runs/optimization-05-tokenizers-20260904/16384/result.json`.
 Best-checkpoint SHA-256:
 `401650ba507e22e31f499bb27f143346441f710018d1c417a968d5addc3b2dab`.
 
-## 8k arm started
+## Completed 8k arm
 
 The final arm passed its real preflight: active targets 2048/1880, accumulation
 weights 0.52138493/0.47861507, short input length 88, padded/trimmed FP32 logit
 difference 2.3246e-6. A BF16 update had finite loss 9.08400 and gradient norm
-6.21082. Training is underway; this is not yet a vocabulary-selection result.
+6.21082.
+
+All 30 epochs / 3,840 updates completed, with best validation at epoch 27.
+Reloading the best checkpoint reproduced the score. All 20 raw outputs were read.
+
+| Measurement | 8k result |
+| --- | ---: |
+| Parameters | 17,440,512 |
+| Validation bits/byte | 0.9101183160 |
+| Mean token loss, not comparable across vocabularies | 3.6098541057 |
+| Validation NLL / targets / scored bytes | 103,685.8395 / 28,723 / 164,360 |
+| Training-only seconds | 885.1326 |
+| Scored training bytes/second | 99,114.85 |
+| Median of epoch 2–30 median update seconds | 0.2284101 |
+| Maximum sampled allocated / driver bytes | 1,691,879,936 / 2,319,319,040 |
+| Mean / worst repeated-trigram ratio | 2.0057% / 6.7308% |
+| Maximum normalized copied span | 8 words |
+| Total generated UTF-8 bytes / words | 27,048 / 2,189 |
+
+Versus fresh 32k: 1.2126% better validation BPB, 20.5005% greater useful-byte
+throughput, 24.9360% lower sampled allocation, and 35.4742% lower sampled driver
+memory. Versus the incumbent, validation BPB is **3.8424% worse**. The latter
+fails the preregistered quality floor despite a clear resource benefit.
+
+Raw review, in saved prompt/seed order: 1 and 3 recycle character descriptions;
+2 repeatedly requests the same weapon; 4 cycles combat boasts; 5 repeats horse
+and warrior motifs; 6 and 8 repeatedly return to Kutubiy; 7 shifts to repeated
+Bakay descriptors. Samples 9–10 loop through riding/attack fragments. Sample 11
+moves between destruction and Jakyp's possessions; 12 repeats a visibility
+phrase; 13 and 15 circle dialogue/death declarations; 14 and 16 shuffle fighting
+descriptions. Sample 17 shifts among Manas, Ajybay and Bakay, repeating names;
+18 repeats weapon/character fragments and includes `Түгөнгөнгөнгөн`; 19 has the
+worst trigram score, repeatedly returning to army/Kongurbay phrases; 20 recycles
+combat descriptions. These observations do not establish fluent long narrative.
+The much shorter decoded outputs also reduce opportunities for exact repeated
+word triples. The copying/repetition audit alone is not a model-quality ranking.
+
+Artifact: `runs/optimization-05-tokenizers-20260904/8192/result.json`.
+Best-checkpoint SHA-256:
+`2639c3821881cf2efc90b503a60a96611fb82e04f2341b03b39fcb38d476f06e`.
+
+## Final decision and next experiment
+
+| Candidate | Validation BPB | Change versus incumbent | Decision |
+| --- | ---: | ---: | --- |
+| Incumbent 32k, original random-window training | 0.8764423051 | reference | Retain |
+| Fresh 32k, equal-byte comparison recipe | 0.9212898049 | +5.1170% | Control only |
+| 16k, equal-byte comparison recipe | 0.9128487286 | +4.1539% | Do not promote |
+| 8k, equal-byte comparison recipe | 0.9101183160 | +3.8424% | Do not promote |
+
+The allowed incumbent ceiling was 0.8852067281 BPB (1% regression); neither
+smaller vocabulary meets it. **Keep the original tokenizer, model dimensions,
+training data and accepted BF16 checkpoint.** No public loader/service change
+is justified, and protected test was never opened for this selection.
+
+Forecast versus evidence: smaller vocabularies did reduce resource cost and were
+slightly better under their shared new training recipe. They did not retain the
+incumbent's quality. This does not prove that 32k is universally optimal or that
+smaller tokenizers could never match it with a different recipe. It establishes
+the result of this fixed-budget, single-seed comparison. Do not extend training
+or change sampling after seeing the scores to manufacture a promotion.
+
+O06 therefore uses original random-window sampling, 3,000 updates and the O02
+BF16 checkpoint/run as its matched control, subject to the initialization and
+evaluation checks documented in report 06. The temporary equal-byte sampler is
+not promoted as an accidental training change.

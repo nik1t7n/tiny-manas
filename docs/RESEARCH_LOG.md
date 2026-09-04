@@ -124,6 +124,20 @@ is shorter in bytes/words under the fixed token budget. Full evidence and raw
 review are in report 05. The controller moved to 8k after its real preflight;
 no architecture run may compete for the GPU yet.
 
+**O05 finished; decision: keep incumbent 32k.** The controller exited successfully.
+8k completed 30 epochs / 3,840 updates, best epoch 27, validation 0.9101183160
+BPB. Versus fresh 32k it gains 20.5005% useful-byte throughput and saves 24.9360%
+sampled tensor allocation; BPB is 1.2126% better. But it remains 3.8424% worse
+than the incumbent, failing the 1% floor. Read all 20 raw outputs: shorter decoded
+text and fewer exact triples still contain name/phrase loops and subword errors.
+All three arms and 60 raw outputs are documented in report 05. No tokenizer,
+checkpoint or data-loader change is promoted; test stayed protected.
+
+**Next O06 action:** use original 32k / 3,000-update random-window training, not
+the temporary O05 sampler. Save and hash a fresh seed-1337 reference initialization,
+run the prepared RoPE numerical/cost gate, and proceed to complete matched
+training only if it passes. O02 BF16 provides the existing matched control.
+
 **O06–O08 execution preparation while 16k trains:** added a shared full-run
 driver with explicit original-random/equal-byte recipes, hashed initial states,
 probe provenance gates and resumable segment checkpoints. RoPE's prepared probe
