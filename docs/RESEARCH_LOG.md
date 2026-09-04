@@ -87,6 +87,13 @@ sequences match the frozen audit. All continuations were read and re-audited
 under word-match protocol 2 (maximum 9, mean trigram repetition 0.0421294).
 BF16 is now training automatically; no precision promotion yet.
 
+**O05 data preparation complete, training not started:** created one read-only
+manifest-pinned bundle of the existing three tokenizers and exactly matching
+train/validation text. See O05 report for directory and manifest hash. CPU
+coverage checks over the actual windows confirm every scored target once and
+identical scored byte totals for all vocabularies. The production pinned loader
+is unchanged. This work does not compete with the ongoing BF16 GPU run.
+
 **Measurement correction:** source inspection and real saved generations found
 asymmetric normalization in the copying audit. Nine of the original 20 samples
 were undercounted; normalized longest match is nine words rather than seven.

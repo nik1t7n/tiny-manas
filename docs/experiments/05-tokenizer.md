@@ -139,8 +139,26 @@ assert that equality when preparing the immutable artifacts.
 
 ## Remaining execution work
 
-Prepare isolated artifacts and extend the real data/tokenizer loading path to
-honor explicit per-experiment hashes without weakening the frozen default.
-Implement equal-text sampling/evaluation and first run one real-batch correctness
-gate. Only then launch the sequential full comparison. No new tokenizer/model
-has been promoted and no learning runs for this comparison have started.
+Prepared, not trained: `runs/optimization-05-data-20260904T060626Z`.
+Manifest SHA-256: `7120ded73b026720bef09797c9ae9d81d261ff7012ab680bc12b3e6aa1231001`.
+Command: `.venv/bin/python scripts/prepare_tokenizer_comparison.py`.
+The script verifies frozen train/validation hashes and all three tokenizer
+hashes, copies real tokenizer artifacts, saves token IDs and exact per-token byte
+lengths, and marks output files read-only. It never opens test. Do not rerun
+preparation merely to acquire another timestamp; reuse this verified bundle.
+
+`scripts/comparison_windows.py` loads only manifest-pinned files. Real CPU
+coverage validation passed for all six variant/split combinations: every scored
+target occurs exactly once, targets equal the source IDs, unscored prefixes are
+excluded, and total scored bytes match the manifest. Training microbatch counts
+per epoch are 205/227/255; validation batches 23/26/29. Training shuffles complete
+256-position windows per epoch, preserving all initial prefix tokens as context
+in the first source window. Validation scores up to 128 new targets per window
+with at most 256 preceding input positions. Unused rows/positions have ignored
+targets, not fabricated supervision. Each update must normalize by its actual
+active-target count, including the final one-microbatch update.
+
+Still required: implement the real training/evaluation driver over these windows,
+verify one real MPS forward/backward including partial-window loss weighting,
+then launch the sequential full comparison after O02–O04. No new tokenizer/model
+has been promoted. No model training for this comparison has started.
