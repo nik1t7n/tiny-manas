@@ -3,6 +3,9 @@
 Status: **correctness passed; rejected by the preregistered cost gate**. Keep
 learned position embeddings. Date: 2026-09-04.
 
+The preparation and acceptance plan below was recorded before execution; the
+completed measurements and decision are in the final section.
+
 Preparation while O05 runs: `scripts/rotary_candidate.py` contains the isolated
 candidate, and `scripts/experiment_architecture_probe.py --change rope` contains its real-data numerical
 and cost gate. Neither changes the accepted model or loads into the ordinary

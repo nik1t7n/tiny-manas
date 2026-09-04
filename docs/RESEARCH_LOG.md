@@ -147,6 +147,14 @@ both halves of the measured samples. This exceeds the preregistered 10% limit:
 do not spend a full run, do not promote RoPE, keep learned positions. Artifact
 and limits are in report 06. Next: O07 RMSNorm using the same fresh reference.
 
+**O07 result: correctness passed, cost gate failed.** Native RMSNorm exactly
+matched the explicit FP32 output/input-gradient/scale-gradient formula on real
+activations. All parameters received gradients; removal saved 6,528 offsets.
+Median updates rose from 0.308569 to 0.341601 seconds (+10.7050%), stable across
+both halves. This exceeds the maximum 5% slowdown permitted even for a quality
+win. Retain LayerNorm; no full retraining is justified by the preregistered rule.
+See report 07 for memory, provenance and limits. Next: O08 matched-width SwiGLU.
+
 **O06–O08 execution preparation while 16k trains:** added a shared full-run
 driver with explicit original-random/equal-byte recipes, hashed initial states,
 probe provenance gates and resumable segment checkpoints. RoPE's prepared probe

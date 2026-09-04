@@ -1,6 +1,7 @@
 # 07 — RMSNorm versus LayerNorm
 
-Status: preregistered, **not run**. Follow the RoPE decision. Date: 2026-09-04.
+Status: **correctness passed; rejected by the cost gate**. Keep LayerNorm.
+Date: 2026-09-04. The setup below is the preregistered plan; results follow it.
 
 Prepared candidate: `scripts/architecture_candidates.py::with_rmsnorm`. It
 copies the current CPU reference and replaces only the 17 normalization sites,
@@ -65,3 +66,40 @@ version-2 copying audit. Accept either (a) >=5% update-speed improvement with
 validation loss no worse than +0.02 nats, or (b) >=0.02 nats validation improvement
 with <=5% latency regression. Otherwise retain LayerNorm. Report single-seed
 selection limits; a close result is inconclusive, not evidence of superiority.
+
+## Result and decision
+
+Command:
+
+```text
+.venv/bin/python scripts/experiment_architecture_probe.py --vocabulary 32768 --change rmsnorm --reference-initial runs/optimization-06-reference-20260904/initial-model.pt --output runs/optimization-07-rmsnorm-probe-20260904
+```
+
+Commit: `291ff3a04ab1ea4cbf404895b4072a64dcb5bf73`. The fresh reference is the
+same hash-pinned 32k initialization used in O06, since RoPE was not promoted:
+`89ff070be491d496dbdbd708e1073eacc258f7214fb111e4c3517b57a1c54457`.
+
+On real first-block features, native RMSNorm exactly matched the explicit FP32
+formula for outputs, input gradients and scale gradients (maximum differences
+all zero). Both input/output were FP32, epsilon 1e-5. The first training update
+had finite pre-clipping gradient norm 6.79266, and all trained parameters received
+gradients. Removing the 17 offset vectors saved the expected 6,528 parameters.
+
+| 35-update comparison, first 5 excluded | LayerNorm | RMSNorm |
+| --- | ---: | ---: |
+| Median update seconds | 0.308569 | 0.341601 |
+| First-half median | 0.308223 | 0.341854 |
+| Second-half median | 0.308593 | 0.341512 |
+| Maximum sampled allocated bytes | 2,253,916,672 | 2,241,037,824 |
+| Maximum sampled driver bytes | 3,560,751,104 | 3,560,669,184 |
+
+Whole updates were **10.7050% slower**, well outside even the quality-improvement
+branch's 5% slowdown ceiling. This is stable across both measured halves and
+does not justify a full quality run. **Retain LayerNorm.** The simpler formula
+did not produce a speed benefit in this installed native MPS implementation.
+No claim about converged quality follows from the short probe; no test split
+or additional generation audit was used after the cost gate failed.
+
+Artifact: `runs/optimization-07-rmsnorm-probe-20260904/result.json`. A different
+fused kernel/backend is a separate future implementation experiment, not a
+reason to override the observed outcome or silently change the current path.
