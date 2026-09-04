@@ -1,7 +1,19 @@
 # 11 — Fused or chunked output loss, conditional on memory pressure
 
-Status: source review and protocol recorded; runtime condition not yet assessed
-on the final selected architecture. No implementation or run. Date: 2026-09-04.
+Status: **assessed, not triggered** after final architecture selection.
+No fused-loss implementation or runtime benchmark. Date: 2026-09-04.
+
+The selected model retains V=32,768, B=8, T=256, GELU and MHA with eager BF16
+training. O04 measured approximately 2.10 GB of sampled live training allocation
+under the 8.26 GB per-process cap. No approved configuration failed because of
+output-logit memory, and no measured output-loss bottleneck justified a custom
+kernel. Even the rejected SwiGLU probe stayed near 2.45 GB. KV caching only
+changes inference, not this training-memory calculation.
+
+Keep ordinary full-vocabulary cross-entropy. The recorded conditional gate
+therefore closes without manufacturing a larger workload or installing CUDA
+dependencies on a Mac. This is a scope/cost decision, not a negative performance
+result for CCE. A future measured memory constraint can reopen the protocol below.
 
 ## Question and forecast
 

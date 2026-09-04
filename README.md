@@ -50,10 +50,16 @@ On September 4 I froze the original source, configurations, data, tokenizer and 
 | 32k / 16k / 8k tokenizer | Smaller vocabularies improved training bytes/s by 16.09% / 20.50%, but validation bits/byte worsened by 4.15% / 3.84% versus the incumbent | Keep the original 32k tokenizer and training recipe |
 | RoPE | Mathematical checks passed; median training updates were 12.27% slower | Keep learned positions; no full quality run |
 | RMSNorm | Formula and gradient checks passed; median training updates were 10.71% slower | Keep LayerNorm; no full quality run |
+| SwiGLU | Matched 3,000-update run: validation loss 4.34578 → 4.42742; more repeated trigrams | Keep GELU |
+| KV cache | Same weights and matching predictions; 1.1566x short-generation speedup, 1.0165x near context overflow | Use request-local prefill/decode with explicit window rebuilding |
+| GQA, 8 Query / 2 KV heads | 75% smaller persistent cache; after matched adaptation, validation loss +0.19402 nats versus MHA | Keep eight independent KV heads |
+| Fused/chunked output loss | Selected workload fits; no measured bottleneck triggered this conditional experiment | Keep ordinary cross-entropy; no speed claim |
 
 The fresh FP32/BF16 runs both processed 12,288,000 training targets, with the same initialization, batches and schedule. BF16 cut training-loop wall time by 20.58% relative to that fresh FP32 control. Comparing against the older 24.4-minute run would mix precision with conditions from another session. I inspected all 20 fixed BF16 continuations: local epic patterns and the existing repetition problems remain. The speed improvement does not establish better prose.
 
-The tokenizer, RoPE and RMSNorm decisions are complete. SwiGLU, KV cache and GQA remain under evaluation. The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) distinguish completed decisions from candidates. The optimization series has not used the test split for selection or changed the deployed checkpoint.
+All numbered decisions are complete. The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) record the outcomes. After selection, the accepted BF16-trained checkpoint was evaluated once on 100 test batches: loss **4.75756**, perplexity **116.46**, top-1 **27.74%**, top-5 **45.27%**. This result was not used for model selection. The optimization improves execution cost, not narrative quality: the 20-output audit still found name loops and broken event continuity, with mean repeated trigrams 4.10%, worst 31.11%, and a longest normalized training-text match of nine words.
+
+The original run's table above remains historical. Release status and rollback evidence are tracked in [the deployment record](docs/experiments/12-release.md).
 
 ## The complete pipeline
 
@@ -504,7 +510,7 @@ All fixed outputs live in [`reports/generation-audits`](reports/generation-audit
 Generation starts with prompt token IDs and repeats five operations:
 
 1. Keep only the last 256 tokens when the sequence exceeds the context window.
-2. Run the Transformer over that context, then apply the LM head to the final position only.
+2. Prefill the context once, then decode the appended token using cached Key/Value tensors. Rebuild from the cropped window after overflow. Apply the LM head to the final position only.
 3. Divide logits by temperature.
 4. Keep the top `k` logits and mask the rest to negative infinity.
 5. Apply softmax, sample one token, append it, and repeat.
@@ -517,7 +523,25 @@ p_i = \frac{\exp(z_i / \tau)}{\sum_j \exp(z_j / \tau)}
 
 Lower temperature concentrates probability on the current leaders. Higher temperature gives lower-ranked tokens more chance. Top-k prevents sampling from the long tail of extremely unlikely tokens.
 
-The current implementation recomputes the active context after every generated token. It does not use a KV cache. This keeps the generation path short and inspectable, though it leaves speed on the table.
+The generation method uses a request-local KV cache. The full-sequence forward pass remains available for training and evaluation; `generate(..., use_cache=False)` selects the uncached generation reference.
+
+### Cache past attention inputs
+
+During prefill, each layer processes the prompt and keeps its Key and Value tensors. During decode, the model processes one new token, appends its Key and Value, and compares its Query with the stored keys. Causality lets us reuse past states while their positions and preceding context remain unchanged. This follows the per-layer caching mechanism described in the [Hugging Face cache guide](https://huggingface.co/docs/transformers/main/cache_explanation).
+
+For one request, the retained storage is
+
+```math
+2 L H_{KV} T d \times \mathrm{bytes\ per\ value}.
+```
+
+Here, `L=8`, `H_KV=8`, `T=256`, `d=48`, and inference uses FP32. The cache owns 6,291,456 bytes (6 MiB). The implementation clones Key/Value views after prefill so their storage does not also retain discarded Query values. Each request creates its own cache; it cannot inherit another request's context.
+
+Single-token decode has no future keys, so it uses attention without a causal mask. Applying an upper-left-aligned rectangular causal mask to that one query would hide almost the entire past. Prefill still uses ordinary causal attention.
+
+The context boundary needs care. Once we crop the oldest token, the surviving tokens receive new learned position IDs, and their deeper states must no longer contain the evicted context. I rebuild the cache from the cropped 256-token window. Merely dropping the oldest Key/Value would change the model's predictions.
+
+On the M5, 20 real validation prompts passed full-logit and greedy-token comparisons, including overflow; worst absolute logit difference was 7.15e-6. Seeded sampling and independent-request checks passed. A 32-token prompt followed by 64 generated tokens took 0.19675 seconds uncached and 0.17011 cached, a 1.1566x speedup. With a 248-token prompt, window rebuilding reduced the gain to 1.0165x. One decode step after 128 past positions took 2.5765 ms instead of 3.3177 ms. These measurements explain both the adoption and its limit. See [experiment 09](docs/experiments/09-kv-cache.md).
 
 ### Project only the position we need
 
@@ -656,16 +680,16 @@ Export a checkpoint without optimizer state:
 ```bash
 uv run tiny-manas export \
   --checkpoint runs/<run>/best-model.pt \
-  --output artifacts/tiny-manas-27m.pt
+  --output artifacts/tiny-manas-27m-bf16-20260904.pt
 ```
 
-The accepted inference artifact is 107,546,203 bytes with SHA-256:
+The optimized inference artifact is 107,547,815 bytes with SHA-256:
 
 ```text
-cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1
+4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494
 ```
 
-The export preserves tied weights without writing a duplicate LM-head matrix.
+The export preserves tied weights without writing a duplicate LM-head matrix. The original `artifacts/tiny-manas-27m.pt` remains unchanged for rollback: 107,546,203 bytes, SHA-256 `cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1`. Weights and licensed corpus data are not committed to Git.
 
 ## 13. Repository structure
 
@@ -680,6 +704,7 @@ src/manas_gpt/
   data.py                   verified download, extraction, tokenization, sampling
   experiment.py             train, evaluate, generate, checkpoint, export
   model.py                  Transformer implementation
+  kv_cache.py               request-local prefill/decode and cache storage
 RESULTS.md                  compact experiment report
 IMPLEMENTATION_PLAN.md      preregistered questions and gates
 ```
@@ -714,6 +739,28 @@ The smaller vocabularies beat the fresh 32k control on both prediction and resou
 RoPE encodes position by rotating pairs of Query and Key coordinates before attention. Their dot products then depend on relative position through the difference between rotation angles. The candidate removed the learned position table, saving 98,304 parameters. Norm preservation, a common-position-offset check and causal masking all passed. On this eager MPS implementation, however, median updates increased from 0.30604 to 0.34360 seconds: 12.27%, above the preregistered 10% ceiling. I stopped before full training. This is a cost rejection of the measured implementation, not evidence that RoPE cannot improve language modeling. See [experiment 06](docs/experiments/06-rope.md).
 
 RMSNorm controls scale without subtracting the feature mean. For a token vector, it divides each value by the square root of the mean squared value plus epsilon, then applies a learned feature scale. It has no learned offset in this candidate, removing 6,528 parameters across the 17 normalization layers. The installed native operation matched the explicit FP32 formula and its gradients, but median updates increased from 0.30857 to 0.34160 seconds: 10.71%, above the 5% ceiling. Fewer mathematical operations did not translate into a faster training step on this backend. I retained LayerNorm without claiming a quality comparison that was never run. See [experiment 07](docs/experiments/07-rmsnorm.md).
+
+### Test a learned FFN gate without adding a larger network
+
+The SwiGLU candidate replaced the GELU FFN with two input projections and a multiplicative gate:
+
+```math
+\mathrm{FFN}(x) = (\mathrm{SiLU}(xW_g^T+b_g) \odot (xW_u^T+b_u))W_d^T+b_d.
+```
+
+I used hidden width 1,024 instead of GELU's 1,536. Three matrices of width 1,024 have the same weight count as two matrices of width 1,536; biases added only 4,096 parameters across the model. The unchanged attention and embedding tensors started identically to the GELU control, while a separate seeded generator initialized the new FFN projections.
+
+The candidate passed the numerical and cost gate, with 3.80% longer updates and 8.82% more sampled allocation, then completed all 3,000 updates. Its independent validation loss was 4.42742, worse than GELU's 4.34578 and the acceptance ceiling of 4.32578. Across 20 fixed continuations, mean repeated trigrams rose from 4.10% to 6.95%; one sample reached 52.78%. I inspected the full texts and found pronounced name and action loops. I retained GELU. A promising intermediate checkpoint-selection score did not override the independent result. [Experiment 08](docs/experiments/08-swiglu.md) includes the complete run and audit.
+
+### Share KV heads only if adaptation preserves quality
+
+GQA retains eight Query heads but shares two Key/Value heads between groups of four queries. Cache storage follows the number of KV heads, not Query heads: at context 256, eight layers and FP32, it falls from 6 MiB to 1.5 MiB. I initialized the new projections by averaging each group of four existing KV heads, then adapted both this candidate and an unchanged MHA control for 150 updates on the same batches. This is a bounded conversion experiment, not GQA training from scratch.
+
+Both cache parity checks passed. Paired decode time increased only 1.10%, but validation loss reached 4.49705 versus adapted MHA's 4.30303, exceeding the allowed +0.05 nats. All 40 outputs were read: GQA repeated fewer trigrams but still lost actors and produced malformed phrases. I retained the original MHA checkpoint, not either adapted arm. The implementation explicitly expands grouped KV tensors for attention; persistent cache savings are not a claim of fused-kernel savings. See [experiment 10](docs/experiments/10-gqa.md).
+
+### Do not optimize an unmeasured output-loss bottleneck
+
+One BF16 logits tensor at batch 8, context 256 and vocabulary 32,768 contains 67,108,864 values, or 128 MiB. It is substantial, but the accepted training workload fits: sampled live allocation was about 2.10 GB against an approximately 8.26 GB process cap. The conditional fused/chunked-loss experiment was therefore assessed and not triggered. Ordinary cross-entropy remains in use; no benchmark of Cut Cross-Entropy is claimed. See [experiment 11](docs/experiments/11-output-loss.md).
 
 ### Tie input and output embeddings
 
@@ -757,7 +804,7 @@ The fixed-batch evaluator bug remains documented. Deleting failed attempts would
 - Evaluation samples random windows rather than scoring every possible held-out window.
 - The context window stops at 256 tokens.
 - Learned absolute positions do not extrapolate beyond the configured context.
-- Generation has no KV cache.
+- KV caching accelerates growing contexts, but exact crop semantics require rebuilding after the 256-token window fills.
 - The corpus license restricts redistribution and commercial use of the source text.
 
 The strongest next experiment would add legally usable Manas-only text from another narrator or edition and reserve entire documents for evaluation. That would test whether the model learned broader epic structure or mainly the local patterns of `Manas01`.

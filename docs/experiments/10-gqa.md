@@ -1,6 +1,64 @@
 # 10 — Grouped-query attention after a correct KV cache
 
-Status: preregistered, **not run**. Follow O09. Date: 2026-09-04.
+Status: **completed; rejected on prediction quality**. Date: 2026-09-04.
+
+## Measured result
+
+Run: `runs/optimization-10-gqa-20260904`; both arms completed exactly 150
+updates from the O02 checkpoint. The immutable input hash is
+`31499eb747c98bcada1c48b12205033cded96573269bc15464ccafd9905e2167`.
+The run records native-cache model revision `b701565` and all source hashes.
+
+| Metric | MHA, 8 KV heads | GQA, 2 KV heads |
+|---|---:|---:|
+| Parameters | 26,877,696 | 25,103,616 |
+| Validation loss before adaptation, exact-byte windows | 4.2968102825 | 5.0746953695 |
+| Validation loss after 150 updates | 4.3030295332 | 4.4970472201 |
+| Validation BPB after adaptation | 0.8777108774 | 0.9172856544 |
+| Full FP32 cache | 6 MiB | 1.5 MiB |
+| Paired median decode, 128 past positions | 2.48075 ms | 2.50810 ms |
+| Median update, first five excluded | 0.309971 s | 0.360744 s |
+| Mean repeated trigrams, 20 outputs | 0.0472084 | 0.0168854 |
+| Longest normalized training-word match | 8 | 7 |
+
+Eight-KV equivalence, two-KV cached/uncached correctness and physical storage
+checks passed. Persistent cache shrank 75%; paired decode regressed 1.10%,
+within the 5% latency gate. The sequential timing would have suggested a 7.57%
+regression; the preregistered interleaved comparison controls that measurement.
+The explicit KV expansion still creates temporary eight-head tensors.
+
+GQA recovered some prediction quality after pooling, but its final loss remained
+0.194018 nats worse than adapted MHA and 0.200237 worse than the original accepted
+MHA. Both exceed the 0.05 ceiling. The adaptation control also failed to improve
+on the original, so neither set of adapted weights replaces the incumbent.
+Do not extend the budget retrospectively or treat this as fresh GQA pretraining.
+
+### Raw-output review and decision
+
+All 20 complete generations from each arm were read. MHA samples 3 and 12
+degenerate into repeated names/subwords; 5–7 cycle through choro/title phrases;
+9–11, 13, 15 and 18 repeat arrivals and combat actions. Samples 1, 2, 4, 8,
+14, 16, 17, 19 and 20 retain recognizable epic motifs but drift among actors
+and include malformed forms. These observations agree with the existing model's
+limitations rather than showing a benefit from extra adaptation.
+
+GQA's lower exact-trigram count does not establish better prose: sample 6 loops
+through hero epithets, 14 and 18 repeatedly return to Esenkan/Beijing, and
+20 recycles army/combat fragments. Samples 1, 2, 7, 8, 12 and 15–17 mix unstable
+speech and identities; 3–5, 9–11, 13 and 19 repeat local action patterns and
+contain malformed words. The quality gate already fails quantitatively.
+
+Decision: keep the accepted original MHA weights plus O09 caching. Preserve
+the conversion/adaptation code as research evidence; do not reinterpret its
+pooled projection tensors as an ordinary MHA checkpoint. The candidate saves
+only 4.5 MiB of cache at our maximum request length, which does not justify the
+measured quality loss. No protected test was used to choose this outcome.
+
+MHA adaptation checkpoint SHA-256:
+`fa8449b15a00e4743b6b87f1031f1cf9d98db7c05212d825b4d180762eec6d4a`.
+GQA adaptation checkpoint SHA-256:
+`ebc2d3f88953a668e6ed85e4d20bdbb5ed708bfe5c6971c7b571fd51819688ee`.
+The preregistration below preserves the original plan and preparation history.
 
 Prepared source, not executed: `scripts/gqa_candidate.py` converts a CPU copy of
 the selected MHA checkpoint. It preserves Q/output weights, pools K/V rows and

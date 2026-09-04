@@ -4,6 +4,30 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 
 ## Optimization series — 2026-09-04
 
+**O10 completed and rejected:** Q8/KV2 reduced the persistent FP32 cache from
+6 to 1.5 MiB. Both MHA and GQA completed the same 150-update adaptation budget.
+GQA validation loss 4.4970472201 versus adapted MHA 4.3030295332 exceeded the
++0.05 gate by a wide margin. Paired decode was only 1.10% slower, but resource
+savings did not justify worse prediction. All 40 continuations were inspected;
+lower GQA repetition did not establish better continuity. Neither adapted arm
+replaces the accepted O02 checkpoint. See [O10](experiments/10-gqa.md).
+
+**O11 assessed, not triggered:** the selected workload fits its memory budget.
+No measured output-loss bottleneck justified another implementation or run.
+No fused-loss speed or quality result is claimed. See [O11](experiments/11-output-loss.md).
+
+**Selection closed; final test evaluated once:** accepted O02 weights plus O01
+and O09 generation changes. FP32 evaluation on 100 original test batches,
+seed 1837: loss 4.7575606346, perplexity 116.461487, top-1 27.7363%, top-5
+45.2720%. These report-only metrics did not select a candidate. The 20-output
+BF16 audit remains valid because cached generation passed parity: mean repeated
+trigrams 4.0973%, maximum 31.1111%, longest normalized word match 9 words.
+All 17 frozen files and the original source archive were SHA-256 reverified.
+The new inference export is 107,547,815 bytes, SHA-256
+`4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494`.
+The original export is untouched. Next: bounded production release and actual
+public generation, with the old image and checkpoint retained for rollback.
+
 **O08 completed after owner-authorized pause/resume:** all 3,000 updates finished;
 best scheduled checkpoint at 2,900. Independent 100-batch validation loss
 4.4274226356 versus GELU 4.3457791471; same-byte BPB 0.8969851760 versus

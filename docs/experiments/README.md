@@ -10,9 +10,9 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 
 ## Checklist
 
-**Resumed by explicit owner instruction on 2026-09-04.** O08 resumes its saved
-2,500-update checkpoint; completed work is not repeated. O09/O10 have not yet
-started. See [pause and recovery history](PAUSED.md).
+**Selection completed on 2026-09-04.** O08 resumed from its saved 2,500-update
+checkpoint and finished; O09/O10 also finished. The protected test was evaluated
+only after selection. See [pause and recovery history](PAUSED.md).
 
 - [x] 00 — Freeze original code, architecture, configs, data, tokenizer, checkpoint and evidence. See [baseline](00-baseline.md) and [verified manifest](00-baseline-manifest.json).
 - [x] 01 — Last-position output projection during generation. [Accepted](01-last-position.md): parity passed, 1.24x model-forward speed at B=1,T=256; 256x smaller output tensor.
@@ -24,9 +24,9 @@ started. See [pause and recovery history](PAUSED.md).
 - [x] 07 — RMSNorm versus LayerNorm. [Rejected on this MPS path](07-rmsnorm.md): outputs/gradients matched the formula, but updates were 10.71% slower. Keep LayerNorm.
 - [x] 08 — SwiGLU versus parameter-matched GELU FFN. [Rejected](08-swiglu.md): full 3,000-update run worsened independent validation loss by 0.08164 nats and increased repetition. Keep GELU.
 - [x] 09 — KV cache with separate prefill/decode. [Accepted](09-kv-cache.md): parity passed; 1.1566x short-generation speedup, only 1.0165x near window overflow. Native generation now uses a request-local cache.
-- [ ] 10 — GQA versus MHA, including quality and actual cache storage. [Preregistered bounded adaptation](10-gqa.md).
-- [ ] 11 — Fused/chunked output loss, conditional on measured output-memory pressure. [Source review and gates](11-output-loss.md); distinguish the Triton kernel from the macOS compile implementation.
-- [ ] Final — Inspect 20 raw generations and memorization for accepted trained models;
+- [x] 10 — GQA versus MHA. [Rejected after matched 150-update adaptation](10-gqa.md): 75% smaller cache, but validation loss +0.19402 nats versus adapted MHA, beyond the +0.05 limit.
+- [x] 11 — Fused/chunked output loss. [Assessed, not triggered](11-output-loss.md): no measured memory or output-loss bottleneck on the selected model; no runtime benchmark claimed.
+- [x] Final — Inspect 20 raw generations and memorization for accepted trained models;
   evaluate protected test only after selection; update technical README with measured results.
 - [ ] Release — Push the completed changes; deploy the accepted checkpoint and
   code to the existing private Tiny Manas service; verify public generation and
