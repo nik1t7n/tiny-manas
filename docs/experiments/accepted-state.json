@@ -1,7 +1,8 @@
 {
   "updated": "2026-09-04",
   "frozen_baseline_tag": "tiny-manas-pre-optimization-20260904",
-  "accepted_experiments": ["01-last-position", "02-bf16"],
+  "accepted_experiments": ["01-last-position", "02-bf16", "09-kv-cache"],
+  "kv_cache": true,
   "training_precision": "bf16",
   "execution": "eager",
   "activation_checkpointing": false,
@@ -17,7 +18,7 @@
   "deployed": false,
   "original_checkpoint_preserved": true,
   "rejected_experiments": ["03-compile", "05-tokenizer", "06-rope", "07-rmsnorm", "08-swiglu"],
-  "next_experiment": "09-kv-cache",
+  "next_experiment": "10-gqa",
   "active_candidate_run": null,
   "active_candidate_status": "none",
   "execution_status": "resumed_by_explicit_owner_instruction",

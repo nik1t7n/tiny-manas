@@ -10,6 +10,7 @@ from torch.nn import functional as F
 
 from .config import ModelConfig
 from .checkpointing import checkpoint_block
+from .kv_cache import CacheSession
 
 
 class CausalSelfAttention(nn.Module):
@@ -138,12 +139,22 @@ class ManasGPT(nn.Module):
         temperature: float,
         top_k: int,
         generator: torch.Generator | None = None,
+        *,
+        use_cache: bool = True,
     ) -> torch.Tensor:
-        if temperature <= 0:
-            raise ValueError("temperature must be positive")
+        if temperature <= 0 or top_k <= 0 or max_new_tokens < 0:
+            raise ValueError("Require positive temperature/top_k and nonnegative length")
+        cache = CacheSession(self) if use_cache else None
         for _ in range(max_new_tokens):
             context = token_ids[:, -self.config.block_size :]
-            logits, _ = self(context, last_position_only=True)
+            if cache is None:
+                logits, _ = self(context, last_position_only=True)
+            elif cache.layers is None or cache.length == self.config.block_size:
+                # Rebuild after cropping: retained tokens change position IDs,
+                # and their deeper representations must forget the evicted prefix.
+                logits = cache.prefill(context)
+            else:
+                logits = cache.decode(token_ids[:, -1:])
             next_logits = logits[:, -1, :] / temperature
             k = min(top_k, next_logits.size(-1))
             threshold = torch.topk(next_logits, k).values[:, [-1]]

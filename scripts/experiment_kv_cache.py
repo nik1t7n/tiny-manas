@@ -5,6 +5,7 @@ from pathlib import Path
 import statistics
 import time
 import traceback
+from functools import partial
 
 import torch
 
@@ -55,6 +56,7 @@ def run(args, out, report):
         raise ValueError("Checkpoint differs from the selected immutable reference")
     data = ComparisonData(BUNDLE, args.vocabulary, MANIFEST_SHA)
     model = load_reference(args.checkpoint, device)
+    uncached_generate = partial(model.generate, use_cache=False)
     if model.config.vocab_size != args.vocabulary or model.config.block_size != 256:
         raise ValueError("Checkpoint vocabulary/context differs from the declared experiment")
     tokens = data.ids["validation"]
@@ -101,7 +103,7 @@ def run(args, out, report):
     # Exercise the actual sampled generation wrapper, also across cropping.
     for length in (32, 248):
         prefix = tokens[:length][None].to(device)
-        expected = model.generate(prefix, 32, .8, 40, torch.Generator(device=device).manual_seed(6036))
+        expected = uncached_generate(prefix, 32, .8, 40, torch.Generator(device=device).manual_seed(6036))
         actual = cached_generate(model, prefix, 32, .8, 40, torch.Generator(device=device).manual_seed(6036))
         if not torch.equal(expected, actual):
             raise AssertionError(f"Actual seeded generation changed for prompt length {length}")
@@ -116,7 +118,7 @@ def run(args, out, report):
             outputs = {}
             for mode in order:
                 generator = torch.Generator(device=device).manual_seed(3407)
-                function = model.generate if mode == "uncached" else lambda *a: cached_generate(model, *a)
+                function = uncached_generate if mode == "uncached" else lambda *a: cached_generate(model, *a)
                 elapsed, outputs[mode] = timed(lambda: function(prefix, 64, .8, 40, generator), memory)
                 session = CacheSession(model)
                 prefill_function = (lambda: model(prefix, last_position_only=True)[0]) if mode == "uncached" else lambda: session.prefill(prefix)

@@ -1,7 +1,51 @@
 # 09 — KV cache with explicit prefill and decode
 
-Status: preregistered, **not run**. Use the accepted MHA checkpoint after O08.
+Status: **completed and accepted** on the O02 BF16-trained MHA checkpoint.
 Date: 2026-09-04.
+
+## Result and adoption
+
+Run: `runs/optimization-09-kv-cache-20260904/result.json`; source revision
+`f00bb9fca455c41e0273d1111d45a135302d41f3`. Checkpoint SHA-256:
+`31499eb747c98bcada1c48b12205033cded96573269bc15464ccafd9905e2167`.
+No training update or parameter change occurred.
+
+All 20 real validation prompts passed full-logit tolerance and greedy-token
+comparison for 32 steps, including the 256-position crop boundary. Worst absolute
+logit error was 7.152557373e-6. Independent-request error was 2.026557922e-6;
+seed-6036 sampled generations matched for both 32- and 248-token prompts.
+Measured logical and unique cache storage both equal **6,291,456 bytes**, FP32.
+
+| Measurement | Uncached | Cached | Speedup |
+|---|---:|---:|---:|
+| 32 prompt tokens, 64 generated tokens | 0.196746 s | 0.170108 s | 1.1566x |
+| 248 prompt tokens, 64 generated tokens | 0.323867 s | 0.318597 s | 1.0165x |
+| One new token after 128 past positions | 3.31775 ms | 2.57654 ms | 1.2877x |
+
+Short/long prefill medians were 2.6505/4.9974 ms uncached and 2.5558/5.1365 ms
+cached. Timing used interleaved pairs, synchronized MPS and FP32 throughout.
+Maximum allocation sampled after timed calls was 113,945,600 bytes; driver
+allocation was 1,229,094,912 bytes. Neither is an exact live peak.
+
+The forecast held: decode benefits while the context grows; repeated window
+rebuilds erase most of the end-to-end gain near overflow. The preregistered
+10% useful pre-overflow threshold passed. Retain that limitation in the README.
+
+Native implementation: `src/manas_gpt/kv_cache.py`; `ManasGPT.generate` enables
+it by default and accepts `use_cache=False` for the uncached reference. Training
+forward remains unchanged. The cache has no model parameters and owns state per
+request. Unsupported training mode, absent learned positions, invalid head
+shapes, multi-token decode and overflowing decode all fail explicitly.
+
+Native integration smoke used the same accepted checkpoint and real validation
+tokens on MPS: seed-6036 generation matched the uncached path for 32/248-token
+prompts and 32 outputs, including overflow; a full native cache owned exactly
+6 MiB. The research runner now explicitly requests `use_cache=False` for its
+reference, preventing a future cached-versus-cached comparison. This verifies
+the changed public method without repeating the full trained-model audit.
+
+The preregistration and preparation history follow; their “not run” statements
+refer to the time before the measured result above.
 
 Prepared while O05 trains: `scripts/kv_cache_candidate.py` provides a separate
 request-local `CacheSession` and cached generation loop. It reuses the selected
