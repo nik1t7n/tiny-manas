@@ -256,3 +256,74 @@ larger master. The resulting **file bytes**, not just token counts, matched the
 prepared 16k and 8k artifacts and their recorded SHA-256 hashes. No BPE training,
 text mutation, GPU computation or new publication was required. If a variant
 wins, use this deterministic verified derivation for its public preparation path.
+
+## Completed fresh 32k control
+
+The 32k arm completed all 30 epochs / 3,090 optimizer updates, processing
+87,729,780 scored source bytes. Its checkpoint selected at epoch 24 reloads and
+reproduces the scheduled exact-byte validation result. This second execution uses
+the same validation windows; it is not a new independent held-out dataset.
+
+| Measurement | Fresh 32k equal-byte control |
+|---|---:|
+| Parameters | 26,877,696 |
+| Best epoch | 24 |
+| Validation bits/byte | 0.9212898049 |
+| Validation mean token loss | 4.5166778052 |
+| Training seconds, including window preparation | 1,066.5891 |
+| Scored training bytes/second | 82,252.65 |
+| Sum of scheduled validation seconds | 43.8814 |
+| Median of warmed epoch median update times | 0.3284022 s |
+| Maximum sampled live allocation | 2,253,916,672 bytes |
+| Maximum sampled driver allocation | 3,594,403,840 bytes |
+| Audited continuations | 20 |
+| Maximum normalized copied word span | 6 |
+| Mean repeated-trigram ratio | 5.9481% |
+| Worst repeated-trigram ratio | 48.7047% |
+| Total generated UTF-8 bytes / words | 33,841 / 2,773 |
+
+The training-time field excludes scheduled validation, checkpoint writing and
+the final generation audit. It is the throughput denominator for comparisons
+with the remaining vocabulary arms, not end-to-end experiment wall time.
+Memory values are sampled, not exact peaks.
+
+Artifact: `runs/optimization-05-tokenizers-20260904/32768/result.json`.
+Best-checkpoint SHA-256:
+`3cd64efe1b3f7e97c9d08014c0046cc1250dc62c71f443faeb6aa446149fef03`.
+All 20 raw outputs are in the adjacent `generation-audit.json` and were read.
+
+### Raw-output review and incumbent comparison
+
+The fresh control is **5.1170% worse in validation BPB** than the accepted
+incumbent on identical evaluation windows. Mean trigram repetition also rose
+from 4.0973% to 5.9481%. The lower maximum copied span, six versus nine words,
+does not compensate for worse prediction and obvious repetition. Generated
+length fell from 35,680 to 33,841 bytes under the same 256-token/sample budget,
+which further limits interpretation of the copying comparison.
+
+Review notes, with sample numbers in prompt/seed order:
+
+- Samples 4 and 6 enter severe name or refrain loops. Sample 6 degenerates into
+  long runs of the same word and has the worst trigram repetition, 48.70%.
+- Samples 12, 16 and 20 repeat horse/weapon phrases with little event progress.
+- Samples 1–3, 5, 7–11, 13 and 18 retain epic vocabulary and short clauses but
+  recycle descriptors, dialogue markers or names while changing entities.
+- Samples 14, 15, 17 and 19 show why exact trigram repetition is incomplete:
+  inflection changes and shuffled names can yield low scores while meaning
+  still drifts. Sample 17 scores zero repeated trigrams but keeps circling the
+  same character and horse names rather than sustaining an event sequence.
+
+These are qualitative failure observations, not a native-speaker fluency score.
+There is no raw-output reason to promote this fresh control over the incumbent.
+The new sampler/schedule and selection protocol differ from the original run;
+this comparison cannot assign the regression to one of them or to vocabulary
+size, which stayed 32k. The control remains necessary for isolating vocabulary
+effects within O05. A smaller candidate must still pass the incumbent floor.
+
+## 16k arm started
+
+The controller moved on to 16k without a concurrent GPU process. Its real
+preflight passed: active targets 2048/1987, accumulation weights
+0.50755886/0.49244114, short input length 195, maximum padded/trimmed FP32 logit
+difference 2.2650e-6. The BF16 update produced finite loss 9.78747 and
+pre-clipping gradient norm 6.28557. Full quality results remain pending.

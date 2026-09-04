@@ -105,6 +105,15 @@ control only after checking initialization and all training/evaluation inputs.
 The current incumbent remains a separate quality floor if a fresh control is
 weaker. This prevents a new sampler's regression from lowering acceptance bars.
 
+**O05 fresh 32k control complete:** 30 epochs / 3,090 updates; best epoch 24;
+exact-byte validation 0.9212898049 BPB, 5.1170% worse than the incumbent's
+0.8764423051. Training-only throughput 82,252.65 bytes/s; sampled allocation
+2.254 GB. Read all 20 raw generations: mean repeated trigrams 5.9481%, worst
+48.7047%, normalized copied span at most six words. Strong refrain/name loops
+remain; do not mistake the shorter copying span for better language modeling.
+Keep this arm as the within-protocol control, not a promoted checkpoint.
+The controller has started 16k after its real padded-window BF16 preflight.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,
