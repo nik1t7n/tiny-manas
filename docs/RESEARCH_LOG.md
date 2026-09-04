@@ -45,6 +45,12 @@ eventual accepted checkpoint and precision explicitly. No concurrent GPU run,
 production compile switch, or assumed BF16 promotion. Require loss/gradient
 parity, >=5% warmed update benefit and cold-cost amortization within 3000 updates.
 
+**O04 preparation (not executed):** inspected installed checkpoint/MPS RNG
+handling and recorded a concrete dropout-preservation risk in
+[04-checkpointing.md](experiments/04-checkpointing.md). The first runtime check
+must include dropout 0.2, gradients and post-backward RNG state; eval-only parity
+would not establish correctness. Defer execution until O02/O03 decisions.
+
 ## E0 — Source, tokenizer, split, and MPS integrity
 
 - **Date:** 2026-08-31
