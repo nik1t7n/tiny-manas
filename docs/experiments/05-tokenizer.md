@@ -109,6 +109,34 @@ bits/byte no more than 1% worse than the fresh 32k control, and no obvious raw
 generation deterioration. A better quality candidate with higher cost gets an
 explicit tradeoff review, not an automatic win. Otherwise keep 32k.
 
+## Real-text sizing check before training
+
+CPU-only encoding of the verified train/validation text produced the following
+counts. Each variant exactly decodes back to the source. Neither test tokens
+nor test text were loaded for this check.
+
+| Vocabulary | Train tokens | Validation tokens | Updates for 30 complete train passes |
+|---|---:|---:|---:|
+| 32,768 | 418,562 | 23,253 | 3,090 |
+| 16,384 | 464,836 | 25,802 | 3,420 |
+| 8,192 | 520,537 | 28,742 | 3,840 |
+
+Update counts assume up to 4096 active target positions per update, with the
+final partial update retained each epoch. The common training prefix is 68
+characters / 126 UTF-8 bytes; validation prefix 71 characters / 129 bytes.
+Encoding prefix and remainder separately exactly reproduces each complete token
+sequence. Prefix token counts differ (train 17/18/23; validation 15/17/19), which
+is why a common raw-byte boundary is necessary.
+
+Scored train bytes per epoch are 2,924,326; scored validation bytes are 164,360.
+For these verified ByteLevel artifacts, summing the character lengths of the
+vocabulary strings for the encoded tokens exactly equals the original UTF-8
+byte count in all six split/variant combinations. Each ByteLevel alphabet
+character represents one byte. This provides exact target-byte accounting for
+the learning-rate progress, without independently decoding partial UTF-8 tokens
+and accidentally counting replacement characters. The implementation must
+assert that equality when preparing the immutable artifacts.
+
 ## Remaining execution work
 
 Prepare isolated artifacts and extend the real data/tokenizer loading path to
