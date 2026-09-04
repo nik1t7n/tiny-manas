@@ -102,7 +102,10 @@ Embedded file hashes identify the actual measured source.
 
 ### Reproduction
 
-Run from the repository with `.venv/bin/python`. Initial weights and real data
+For the historical staged runs use source revision `29d30e3` and run from the
+repository with `.venv/bin/python`. Later native integration changes provenance
+hashes; do not reinterpret old run directories as runs of the latest source.
+Initial weights and real data
 must already exist at the pinned paths; these commands do not download or create
 replacement inputs. Use a new output directory for probes. Execute sequentially.
 
@@ -223,5 +226,59 @@ provenance rather than rewritten to pretend the native config was the original.
 Export: `artifacts/tiny-manas-27m-rope-20260904.pt`, 107,157,586 bytes;
 SHA-256 `abc13354d5cb1cc94c966985d95252befdfaf9f25b19c1884701442f4e519d8f`.
 Evidence: `runs/quality-followup-rope-20260904/promotion.json`.
-Production release is the remaining gate; the previous image and weights remain
-available for rollback.
+Production release passed; the previous image and weights remain available for
+rollback. See the final section below.
+
+### Post-selection test
+
+After selecting RoPE, completing its native parity gate and closing the RMSNorm
+pilot, the ordinary evaluator ran once on 100 test batches, seed 1837, FP32,
+204,800 target tokens. Loss: **4.53125801**, perplexity: **92.87533**, top-1:
+**31.698%**, top-5: **48.527%**, approximate BPB: **.94590037**. The old BF16
+checkpoint's same-protocol test loss was 4.75756063. This measurement reports
+the already selected model; it did not decide stage continuation or select
+between candidates. The test split is not a newly unseen external benchmark.
+Evidence: `runs/quality-followup-release-20260904/test-evaluation.json`.
+
+### Production release: completed
+
+The clean, pushed native source commit was
+`437195fb1a109e3ff392aaae7c4c350518b9df76`. Only its tracked archive was built on
+OVH; the private model file was transferred separately and its SHA-256 verified.
+Image: `manas-gpt:437195fb1a109e3ff392aaae7c4c350518b9df76`.
+Image ID: `sha256:e3606db62aaf4cb434f415bbebd61dba9dbf87e3269decaad7701e5b6a900e99`.
+
+The isolated real candidate loaded the new export, reported RoPE and KV caching,
+rejected unauthenticated generation with 401 and generated 16 tokens. Coolify's
+stored Compose/image variable and generated runtime configuration were updated
+together. A fail-closed comparison allowed only the model image, checkpoint
+path/hash and shared `MANAS_IMAGE` metadata to change. Cutover used component-only
+`docker compose up -d --no-deps --no-build --pull never manas`.
+
+Production container `manas-p5h6dziyjkyfejbiyqa8firs` is healthy, running exact
+image ID above, with export SHA-256 `abc13354d5cb1cc94c966985d95252befdfaf9f25b19c1884701442f4e519d8f`,
+step 2,900, context 256 and 26,779,392 parameters. Limits remain 1 GiB/two CPUs;
+the model mount remains read-only. Production container ID:
+`8f30e0f589b154cc819566ed6ffbe31149c3e26efa7571f5cf37c10341623a2b`.
+The website container stayed exactly
+`e87cc87d02082bdc1f7cb5de265b58c99395f5e691ef6dbaf3e30eb1e1a1c59a`.
+
+A real request through `https://nik1t7n.com/api/manas/generate` returned 200 and
+16 generated tokens (54.80 tokens/s in this one CPU smoke, not a controlled speed
+comparison). The public four-field request contract, rate limits and output caps
+were unchanged. No new browser UI acceptance is claimed for this model-only
+release. The temporary candidate container was removed after acceptance.
+
+Rollback retains image `manas-gpt:67afe940d1f38ba4e0712c0851c69317957ac8ac` and
+`/models/tiny-manas-27m-bf16-20260904.pt`, SHA-256
+`4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494`.
+Restore that image, checkpoint path and hash together through Coolify, render its
+configuration, then recreate only `manas`. The old runtime/controller configuration
+and acceptance records are in root-only
+`/opt/manas-gpt/releases/437195fb1a109e3ff392aaae7c4c350518b9df76-rollback`.
+Do not publish its environment or raw configuration.
+
+An initial build invocation reached chmod before the asynchronous artifact
+transfer finished and stopped without building or touching production. The build
+was then run independently from the completed source archive; cutover waited for
+the complete model transfer and hash verification. No partial artifact was loaded.

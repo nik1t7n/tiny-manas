@@ -14,14 +14,21 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 checkpoint and finished; O09/O10 also finished. The protected test was evaluated
 only after selection. See [pause and recovery history](PAUSED.md).
 
+**Later same-day quality follow-up:** the owner reopened O06/O07 with staged
+training instead of cost-only rejection. RoPE earned a full run and was selected;
+RMSNorm stopped at 900 updates for no material gain. See [experiment 13](13-quality-followup.md).
+RoPE has now been deployed with native KV caching. The public generation request
+passed, the website container was not restarted, and the previous image/weights
+remain available for rollback.
+
 - [x] 00 — Freeze original code, architecture, configs, data, tokenizer, checkpoint and evidence. See [baseline](00-baseline.md) and [verified manifest](00-baseline-manifest.json).
 - [x] 01 — Last-position output projection during generation. [Accepted](01-last-position.md): parity passed, 1.24x model-forward speed at B=1,T=256; 256x smaller output tensor.
 - [x] 02 — BF16 mixed precision. [Accepted](02-bf16.md): 20.58% shorter full training, validation +0.0000464 nats, all 20 outputs reviewed. 27M training uses BF16; inference remains FP32.
 - [x] 03 — `torch.compile` and fusion. [Rejected on this MPS workload](03-compile.md): diagnosed a broadcast-gradient failure; corrected candidate passed parity but updates were 3.02% slower.
 - [x] 04 — Activation checkpointing. [Accepted opt-in, off by default](04-checkpointing.md): 38.46% less sampled allocation, 30.63% slower updates; explicit MPS dropout-RNG preservation verified.
 - [x] 05 — 32k / 16k / 8k tokenizer comparison. [Keep incumbent 32k](05-tokenizer.md): smaller variants save resources but worsen validation BPB by 4.15% / 3.84% versus the accepted model, beyond the 1% limit. All 60 new raw outputs reviewed.
-- [x] 06 — RoPE versus learned positions. [Rejected on this MPS path](06-rope.md): correctness passed, but median updates were 12.27% slower, beyond the 10% ceiling. Keep learned positions.
-- [x] 07 — RMSNorm versus LayerNorm. [Rejected on this MPS path](07-rmsnorm.md): outputs/gradients matched the formula, but updates were 10.71% slower. Keep LayerNorm.
+- [x] 06 — RoPE versus learned positions. [Accepted after quality follow-up](13-quality-followup.md): validation loss 4.34578 → 4.11584, perplexity −20.54%; native loading/cache parity passed. The earlier cost-only verdict is historical.
+- [x] 07 — RMSNorm versus LayerNorm. [Pilot stopped at 900 updates](13-quality-followup.md): last-three mean validation delta +.00331, no material advantage. Keep LayerNorm; do not infer full-budget inferiority.
 - [x] 08 — SwiGLU versus parameter-matched GELU FFN. [Rejected](08-swiglu.md): full 3,000-update run worsened independent validation loss by 0.08164 nats and increased repetition. Keep GELU.
 - [x] 09 — KV cache with separate prefill/decode. [Accepted](09-kv-cache.md): parity passed; 1.1566x short-generation speedup, only 1.0165x near window overflow. Native generation now uses a request-local cache.
 - [x] 10 — GQA versus MHA. [Rejected after matched 150-update adaptation](10-gqa.md): 75% smaller cache, but validation loss +0.19402 nats versus adapted MHA, beyond the +0.05 limit.
@@ -51,7 +58,10 @@ Quality-changing changes require matched training budgets, fixed validation
 selection, and raw outputs. A short stability probe is not evidence of final
 quality. Validation, not protected test, decides which changes survive.
 
-If a result is noisy, unsupported on MPS, slower, or harms quality beyond the
-predeclared tolerance, do not promote it. Keep the report and research runner.
+If a result is inconclusive, unsupported on MPS, or harms quality beyond the
+predeclared tolerance, do not promote it. For architectural changes, evaluate
+cost against demonstrated quality benefit rather than vetoing a modest slowdown
+before quality is measured. Use the explicit staged protocol for O06/O07.
+Keep the report and research runner.
 Do not quietly fall back to CPU. Never overwrite the frozen baseline or accepted
 checkpoint. Use bounded runs on the actual M5/16 GB host, not assumed Mac Studio resources.

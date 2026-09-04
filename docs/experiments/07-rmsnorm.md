@@ -1,7 +1,10 @@
 # 07 — RMSNorm versus LayerNorm
 
-Status: **correctness passed; rejected by the cost gate**. Keep LayerNorm.
-Date: 2026-09-04. The setup below is the preregistered plan; results follow it.
+Latest status: **keep LayerNorm after a 900-update quality pilot**. Date:
+2026-09-04. The [follow-up](13-quality-followup.md) lifted the cost-only veto but
+found no material gain: mean validation delta +.00331 over the last three checks.
+Stopping saved 2,100 updates. Final full-budget RMSNorm quality remains unknown.
+The original setup and cost-gate results below are retained as historical evidence.
 
 Prepared candidate: `scripts/architecture_candidates.py::with_rmsnorm`. It
 copies the current CPU reference and replaces only the 17 normalization sites,

@@ -4,6 +4,22 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 
 ## O06/O07 quality follow-up — 2026-09-04
 
+**Research completed:** the fresh 100-update control reproduced validation within
+.000006485, permitting reuse of the historical curve. RoPE passed all staged
+gates and completed 3,000 updates: independent validation 4.11583555 versus
+4.34577915, perplexity −20.54%. All 20 raw continuations were read; repetition
+remained similar (mean .041337 versus .040973), with the same continuity limits.
+RMSNorm stopped at 900 updates: last-three mean delta +.003312, no material gain.
+The 2,100 remaining updates were not spent. Native RoPE initialization, loading,
+export, cached decode and overflow parity passed. A post-selection test measured
+loss 4.53125801 versus the previous checkpoint's 4.75756063. RoPE is selected;
+LayerNorm remains. Production release evidence is recorded in experiment 13.
+
+**Updated belief:** the original 10%/5% latency-only ceilings could exclude a
+useful architecture. A measured, meaningful quality gain can justify modest
+additional update cost. A flat short pilot only supports a budget stop, not a
+universal rejection of the method.
+
 Owner-approved reopening: a 10–15% latency cost must not substitute for a quality
 measurement. The preregistered [staged protocol](experiments/13-quality-followup.md)
 uses a 100-update control calibration, then one-change RoPE/RMSNorm arms with a

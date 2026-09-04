@@ -1,10 +1,13 @@
 # 06 — Rotary positions versus learned position embeddings
 
-Status: **correctness passed; rejected by the preregistered cost gate**. Keep
-learned position embeddings. Date: 2026-09-04.
+Latest status: **RoPE accepted after the staged quality follow-up**. Date:
+2026-09-04. [Experiment 13](13-quality-followup.md) supersedes the earlier cost-only
+decision: a matched full run reduced independent validation loss by .22994 nats
+and perplexity by 20.54%, with no material generation-audit regression.
 
-The preparation and acceptance plan below was recorded before execution; the
-completed measurements and decision are in the final section.
+The historical preparation, original cost ceiling and initial measurements below
+are preserved rather than rewritten. They did not measure full quality; the
+later follow-up did. See its report for native/cache parity and release status.
 
 Preparation while O05 runs: `scripts/rotary_candidate.py` contains the isolated
 candidate, and `scripts/experiment_architecture_probe.py --change rope` contains its real-data numerical

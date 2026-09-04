@@ -1,12 +1,14 @@
 # Tiny Manas
 
-**A 26.9M-parameter decoder-only Transformer trained from scratch on the Kyrgyz epic *Manas*.**
+**A roughly 27M-parameter decoder-only Transformer trained from scratch on the Kyrgyz epic *Manas*.**
 
 [Read the general-audience article](https://nik1t7n.com/essays/training-tiny-manas) · [Inspect the tokenizer](https://github.com/nik1t7n/kyrgyz-tokenizer) · [Browse the experiment results](#experimental-results)
 
 Tiny Manas is a small language model that learns to continue one edition of the Kyrgyz epic *Manas*. I wrote the model and the training pipeline to study the complete language-model path without hiding the important mechanics behind a large framework: verified text acquisition, byte-level BPE tokenization, shifted training batches, causal self-attention, backpropagation, checkpoint selection, generation, and memorization analysis.
 
 The original accepted model has 26,877,696 parameters. It contains eight Transformer blocks, eight attention heads, 384 features per token, and a context window of 256 tokens. I trained it on an M5 MacBook Pro with 16 GB of unified memory. That run took 24.4 minutes. The optimization series below builds on a frozen copy of this model and its evidence.
+
+The September 4 quality follow-up selected **RoPE with 26,779,392 parameters**. On matched validation data, loss improved from 4.34578 to 4.11584 and perplexity fell 20.54%. LayerNorm and the GELU FFN remain unchanged. The [follow-up report](docs/experiments/13-quality-followup.md) separates the staged pilot, full quality result and deployment evidence; the original measurements below remain historical results, not scores for the new weights.
 
 Tiny Manas is a research model, not a general Kyrgyz assistant. It has seen one edition of one epic. It can reproduce names, rhythm, speech patterns, and short chains of action from that source distribution. It cannot answer general questions, follow instructions, or maintain a reliable long narrative.
 
@@ -48,8 +50,8 @@ On September 4 I froze the original source, configurations, data, tokenizer and 
 | `torch.compile` | Original compiled gradients failed parity; corrected research variant passed but took 3.02% longer per update | Keep eager execution |
 | Activation checkpointing | 38.46% less sampled live allocation; 30.63% longer updates | Offer as an opt-in; leave off for the current model |
 | 32k / 16k / 8k tokenizer | Smaller vocabularies improved training bytes/s by 16.09% / 20.50%, but validation bits/byte worsened by 4.15% / 3.84% versus the incumbent | Keep the original 32k tokenizer and training recipe |
-| RoPE | Mathematical checks passed; median training updates were 12.27% slower | Keep learned positions; no full quality run |
-| RMSNorm | Formula and gradient checks passed; median training updates were 10.71% slower | Keep LayerNorm; no full quality run |
+| RoPE | Staged follow-up earned a full run: validation 4.34578 → 4.11584; perplexity −20.54% | Accept RoPE; refreshed probe measured +9.89% update cost |
+| RMSNorm | 900-update pilot: mean validation delta +.00331 over its last three checks | Keep LayerNorm; stop for no material gain, saving 70% of the full update budget |
 | SwiGLU | Matched 3,000-update run: validation loss 4.34578 → 4.42742; more repeated trigrams | Keep GELU |
 | KV cache | Same weights and matching predictions; 1.1566x short-generation speedup, 1.0165x near context overflow | Use request-local prefill/decode with explicit window rebuilding |
 | GQA, 8 Query / 2 KV heads | 75% smaller persistent cache; after matched adaptation, validation loss +0.19402 nats versus MHA | Keep eight independent KV heads |
@@ -57,9 +59,9 @@ On September 4 I froze the original source, configurations, data, tokenizer and 
 
 The fresh FP32/BF16 runs both processed 12,288,000 training targets, with the same initialization, batches and schedule. BF16 cut training-loop wall time by 20.58% relative to that fresh FP32 control. Comparing against the older 24.4-minute run would mix precision with conditions from another session. I inspected all 20 fixed BF16 continuations: local epic patterns and the existing repetition problems remain. The speed improvement does not establish better prose.
 
-All numbered decisions are complete. The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) record the outcomes. After selection, the accepted BF16-trained checkpoint was evaluated once on 100 test batches: loss **4.75756**, perplexity **116.46**, top-1 **27.74%**, top-5 **45.27%**. This result was not used for model selection. The optimization improves execution cost, not narrative quality: the 20-output audit still found name loops and broken event continuity, with mean repeated trigrams 4.10%, worst 31.11%, and a longest normalized training-text match of nine words.
+The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) record the outcomes. The earlier BF16 checkpoint's post-selection test measured loss **4.75756**, perplexity **116.46**, top-1 **27.74%**, top-5 **45.27%**; these numbers must not be attributed to RoPE. The subsequent RoPE selection used validation, not test. Across its 20 inspected continuations, mean repeated trigrams were 4.13%, worst 19.02%, and the longest normalized training match was eleven words. Improved prediction has not eliminated name loops, malformed words or broken event continuity.
 
-The original run's table above remains historical. Release status and rollback evidence are tracked in [the deployment record](docs/experiments/12-release.md).
+After RoPE was selected, one 100-batch test evaluation measured loss **4.53126**, perplexity **92.88**, top-1 **31.70%**, and top-5 **48.53%**. The original run's table above remains historical. RoPE is now deployed; [the follow-up release record](docs/experiments/13-quality-followup.md#production-release-completed) contains the exact image, artifact hash, public-generation acceptance and rollback target. The [earlier release](docs/experiments/12-release.md) remains documented separately.
 
 ## The complete pipeline
 
@@ -221,7 +223,7 @@ X.shape          = (B, T, C)
 
 Token embeddings let the model learn how token identities behave. Position embeddings distinguish the same token at different places in a sequence. Without positional information, self-attention would know which token vectors exist but would have no direct signal for their order.
 
-The implementation uses learned absolute positions because they are easy to inspect and sufficient for a 256-token research context. RoPE and other relative schemes remain useful future experiments, but changing them during the baseline would introduce another variable.
+The equations above describe the original learned-position baseline. The accepted follow-up uses **RoPE** instead: it omits the additive position table and rotates adjacent coordinate pairs in Query and Key before their dot products. For pair index j at position p, the angle is `p × 10000^(-2j/48)`. Value is not rotated. The shared implementation lives in `src/manas_gpt/rotary.py`; `position_encoding="learned"` preserves old checkpoints, while the new configuration explicitly selects `"rope"`. Context remains 256: this experiment did not establish longer-context quality.
 
 ### 4.2 Pre-LayerNorm and residual paths
 
@@ -629,7 +631,7 @@ This command downloads the real artifacts, verifies their checksums, extracts th
 Run the final training configuration:
 
 ```bash
-uv run tiny-manas train --config configs/manas01-27m.toml
+uv run tiny-manas train --config configs/manas01-27m-rope.toml
 ```
 
 Each run creates an immutable timestamped directory under `runs/` with:
@@ -736,9 +738,9 @@ The smaller vocabularies beat the fresh 32k control on both prediction and resou
 
 ### Measure architectural substitutions on the target hardware
 
-RoPE encodes position by rotating pairs of Query and Key coordinates before attention. Their dot products then depend on relative position through the difference between rotation angles. The candidate removed the learned position table, saving 98,304 parameters. Norm preservation, a common-position-offset check and causal masking all passed. On this eager MPS implementation, however, median updates increased from 0.30604 to 0.34360 seconds: 12.27%, above the preregistered 10% ceiling. I stopped before full training. This is a cost rejection of the measured implementation, not evidence that RoPE cannot improve language modeling. See [experiment 06](docs/experiments/06-rope.md).
+RoPE encodes position by rotating pairs of Query and Key coordinates before attention. Their dot products then depend on relative position through the difference between rotation angles. Removing the position table saves 98,304 parameters. The first probe passed correctness but hit a 12.27% latency regression and stopped at a 10% ceiling. That was too restrictive for answering a quality question. In the [reopened experiment](docs/experiments/13-quality-followup.md), I calibrated the stored control with 100 fresh updates, then gave RoPE 600 updates before its first pruning decision. It remained consistently better at 600, 900, 1,200 and 1,500, earning the full 3,000-update run. Independent validation improved by .22994 nats (20.54% lower perplexity), while mean repetition stayed nearly unchanged. RoPE was selected; native loading and KV-cache parity passed. The [original report](docs/experiments/06-rope.md) retains the earlier cost-only decision for traceability.
 
-RMSNorm controls scale without subtracting the feature mean. For a token vector, it divides each value by the square root of the mean squared value plus epsilon, then applies a learned feature scale. It has no learned offset in this candidate, removing 6,528 parameters across the 17 normalization layers. The installed native operation matched the explicit FP32 formula and its gradients, but median updates increased from 0.30857 to 0.34160 seconds: 10.71%, above the 5% ceiling. Fewer mathematical operations did not translate into a faster training step on this backend. I retained LayerNorm without claiming a quality comparison that was never run. See [experiment 07](docs/experiments/07-rmsnorm.md).
+RMSNorm controls scale without subtracting the feature mean: divide by the square root of the mean squared value plus epsilon, then apply a learned feature scale. Omitting offsets removes 6,528 parameters. Its first native MPS probe passed formula/gradient checks but was 10.71% slower. The follow-up did not use that latency as a veto: RMSNorm trained for 900 matched updates. Its last three validation differences averaged only +.00331 nats, with no meaningful improving relative trend, so the registered budget rule stopped it. That saved 2,100 updates. LayerNorm remains selected; this pilot does not prove that RMSNorm could never improve with a different budget or setup. See [experiment 07](docs/experiments/07-rmsnorm.md) and the [quality follow-up](docs/experiments/13-quality-followup.md).
 
 ### Test a learned FFN gate without adding a larger network
 

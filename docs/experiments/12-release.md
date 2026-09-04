@@ -1,5 +1,9 @@
 # Final evaluation and production release — 2026-09-04
 
+Historical release record. The later same-day [RoPE follow-up release](13-quality-followup.md#production-release-completed)
+supersedes the current-image and selected-checkpoint fields below; this BF16
+learned-position release is retained as the immediate rollback target.
+
 ## Research gate: passed
 
 All O00–O11 decisions are closed. Accepted: last-position logits, BF16 training,
