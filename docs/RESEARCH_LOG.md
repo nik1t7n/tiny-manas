@@ -114,6 +114,13 @@ remain; do not mistake the shorter copying span for better language modeling.
 Keep this arm as the within-protocol control, not a promoted checkpoint.
 The controller has started 16k after its real padded-window BF16 preflight.
 
+**O06–O08 execution preparation while 16k trains:** added a shared full-run
+driver with explicit original-random/equal-byte recipes, hashed initial states,
+probe provenance gates and resumable segment checkpoints. RoPE's prepared probe
+now consumes the same pinned initialization and selected sampler. Only CLI
+parsing has run. The first real full-driver segment will be retained and resumed,
+not discarded as a separate short training run. No architecture has been adopted.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,

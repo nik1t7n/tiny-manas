@@ -6,6 +6,12 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from manas_gpt.config import ModelConfig
+from manas_gpt.model import ManasGPT
+from rotary_candidate import candidate_from
+
+CLASSIC_FIELDS = ("block_size", "n_layer", "n_head", "n_embd", "ffn_multiplier", "dropout", "bias", "tie_embeddings", "vocab_size")
+
 
 class FP32RMSNorm(nn.RMSNorm):
     def __init__(self, width):
@@ -62,4 +68,23 @@ def with_swiglu(reference, ffn_seed=1337):
     generator = torch.Generator(device="cpu").manual_seed(ffn_seed)
     for block in model.blocks:
         block.ffn = SwiGLUFeedForward(model.config, generator)
+    return model
+
+
+def apply_change(reference, change):
+    if change == "rope":
+        return candidate_from(reference, torch.device("cpu"))
+    if change == "rmsnorm":
+        return with_rmsnorm(reference)
+    if change == "swiglu":
+        return with_swiglu(reference)
+    raise ValueError(f"Unknown architectural change: {change}")
+
+
+def restore_model(payload):
+    config = ModelConfig(**{key: payload["model_config"][key] for key in CLASSIC_FIELDS})
+    model = ManasGPT(config)
+    for change in payload["protocol"]["architecture_changes"]:
+        model = apply_change(model, change)
+    model.load_state_dict(payload["model"])
     return model

@@ -6,6 +6,16 @@ from torch.nn import functional as F
 from manas_gpt.model import ManasGPT
 
 
+def candidate_from(reference, device):
+    candidate = RotaryGPT(reference.config)
+    state = {name: value.detach().cpu() for name, value in reference.state_dict().items()
+             if not name.startswith("position_embedding.")}
+    candidate.load_state_dict(state)
+    if any(not torch.equal(value, candidate.state_dict()[name]) for name, value in state.items()):
+        raise AssertionError("RoPE changed shared initial parameters")
+    return candidate.to(device)
+
+
 def rotary_tables(positions, head_size):
     if head_size % 2:
         raise ValueError("Adjacent-pair RoPE requires an even head size")

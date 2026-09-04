@@ -10,27 +10,37 @@ import traceback
 import torch
 
 from comparison_windows import ComparisonData
-from experiment_tokenizers import (BUNDLE, MANIFEST_SHA, ROOT, initialize, optimizer_for,
+from architecture_candidates import restore_model
+from experiment_tokenizers import (BUNDLE, MANIFEST_SHA, ROOT, optimizer_for,
                                    save_json, sha, update)
 from manas_gpt.config import load_config
+from manas_gpt.data import RandomWindowSampler, load_split
 from manas_gpt.experiment import environment_info, require_mps, seed_everything
-from rotary_candidate import RotaryGPT, rotate_pairs, rotary_tables
+from rotary_candidate import candidate_from, rotate_pairs, rotary_tables
 
 
-def candidate_from(reference, device):
-    candidate = RotaryGPT(reference.config)
-    state = {name: value.detach().cpu() for name, value in reference.state_dict().items()
-             if not name.startswith("position_embedding.")}
-    candidate.load_state_dict(state)
-    if any(not torch.equal(value, candidate.state_dict()[name]) for name, value in state.items()):
-        raise AssertionError("RoPE changed shared initial parameters")
-    return candidate.to(device)
+def probe_updates(data, recipe, config):
+    if recipe == "equal-bytes":
+        yield from data.training_updates(0)
+        return
+    if recipe != "random-windows" or config.model.vocab_size not in (0, 32768):
+        raise ValueError("Unsupported probe recipe")
+    tokens = load_split(config.data.dataset, "train")
+    if not torch.equal(tokens, data.ids["train"]):
+        raise RuntimeError("Original and prepared token sequences differ")
+    sampler = RandomWindowSampler(tokens, 8, 256, 1338)
+    for _ in range(35):
+        batches = []
+        for _ in range(2):
+            x, y = sampler.next(torch.device("cpu"))
+            batches.append({"x": x, "y": y, "targets": y.numel()})
+        yield {"batches": batches}
 
 
 @torch.no_grad()
 def rotation_gate(model, data, device):
     model.eval()
-    first = next(data.training_updates(0))["batches"][0]
+    first = next(batch for item in data.training_updates(0) for batch in item["batches"] if batch["targets"] == 2048)
     x = first["x"][0:1].to(device)
     block = model.blocks[0]
     features = block.ln_attention(model.token_embedding(x))
@@ -69,6 +79,7 @@ def rotation_gate(model, data, device):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vocabulary", type=int, choices=(32768, 16384, 8192), required=True)
+    parser.add_argument("--reference-initial", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     out = args.output.resolve()
@@ -77,15 +88,24 @@ def main():
     torch.mps.set_per_process_memory_fraction(.65)
     config = load_config(ROOT / "configs/manas01-27m.toml")
     data = ComparisonData(BUNDLE, args.vocabulary, MANIFEST_SHA)
+    initial = torch.load(args.reference_initial, map_location="cpu", weights_only=False)
+    if initial["protocol"]["vocabulary"] != args.vocabulary or initial["protocol"]["architecture_changes"]:
+        raise ValueError("O06 requires a fresh classic reference with the selected vocabulary")
     report = {"status": "running", "environment": environment_info(device),
               "vocabulary": args.vocabulary, "config_sha256": config.sha256,
               "manifest_sha256": MANIFEST_SHA, "script_sha256": sha(__file__),
               "candidate_sha256": sha(Path(__file__).with_name("rotary_candidate.py")),
+              "model_source_sha256": sha(ROOT / "src/manas_gpt/model.py"),
+              "training_helpers_sha256": sha(Path(__file__).with_name("experiment_tokenizers.py")),
+              "change": "rope", "reference_initial_sha256": sha(args.reference_initial),
+              "recipe": initial["protocol"]["recipe"],
               "precision": "bf16 training, fp32 parameters; fp32 mathematical checks",
               "dropout": .2, "updates_per_mode": 35, "warmup_excluded": 5,
               "modes": {}, "quality_evaluated": False}
     try:
-        reference = initialize(config, args.vocabulary, torch.device("cpu"))
+        reference = restore_model(initial)
+        if reference.config != config.model.with_vocab_size(args.vocabulary):
+            raise ValueError("Reference model configuration changed")
         candidate = candidate_from(reference, device)
         report["correctness"] = rotation_gate(candidate, data, device)
         report["parameter_saving"] = reference.parameter_count() - candidate.parameter_count()
@@ -98,12 +118,12 @@ def main():
             if mode == "rope":
                 model = candidate_from(reference, device)
             else:
-                model = initialize(config, args.vocabulary, device)
+                model = restore_model(initial).to(device)
             optimizer = optimizer_for(model, config)
             seed_everything(1337)
             durations, losses = [], []
             memory = {"allocated": 0, "driver": 0}
-            for index, item in enumerate(data.training_updates(0)):
+            for index, item in enumerate(probe_updates(data, report["recipe"], config)):
                 if index == 35:
                     break
                 start = time.perf_counter()

@@ -78,6 +78,24 @@ candidate initialization with its configuration and hash before full training;
 later architecture comparisons can reuse those tensors without relying on a
 seed that may consume a different random-number sequence after module changes.
 
+The prepared `scripts/experiment_architecture.py` supports these two explicit
+recipes. It bootstraps a classic reference initialization after O05 selection,
+then requires that exact file/hash in the numerical probe and full run. The
+full-run gate checks the candidate, reference initialization, configuration and
+source hashes against the passed probe. It saves the candidate's initial state
+and checkpoints at each epoch or 100-update boundary. Original random-window
+resumption reconstructs private sampler RNG states by replaying their index
+draws; it does not rerun completed model updates. It preserves the original
+initial 30 validation/train-evaluation batches and subsequent selection cadence.
+Early stopping is disabled to match the full 3,000-update control budget.
+
+Only CLI parsing has run so far. After the real probe passes, first run one
+segment using `--stop-after-segment 1`, inspect its real checkpoint/metrics, and
+resume the same run without the pause flag. That verifies the training path
+without throwing away its first updates. Final output/audit and promotion remain
+pending all 30 segments. No bootstrap, MPS probe or architectural training has
+started while O05 owns the GPU.
+
 ## Correctness and acceptance
 
 Before training, use Q/K from real corpus inputs to verify pairwise norm
