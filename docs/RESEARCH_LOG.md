@@ -89,6 +89,13 @@ loss as a weight improvement. Fresh 32k training is active. Use process liveness
 plus per-arm `history.json`/`result.json`; do not start duplicate training.
 O06's isolated candidate/probe is prepared and CLI-parsed only, not GPU-verified.
 
+**O11 source review while O05 trains:** read the CCE paper and official repository.
+Its macOS default is a separate `torch_compile` implementation, not the paper's
+Triton kernel; some CCE variants filter small gradients. Recorded the conditional
+memory/cost question and explicit backend/numerical gates in
+[11-output-loss.md](experiments/11-output-loss.md). Current BF16 training fits;
+reassess after final architecture selection before spending another GPU run.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,

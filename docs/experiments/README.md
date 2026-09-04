@@ -20,7 +20,7 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 - [ ] 08 — SwiGLU versus parameter-matched GELU FFN. [Preregistered](08-swiglu.md).
 - [ ] 09 — KV cache with separate prefill/decode on the accepted MHA checkpoint. [Preregistered](09-kv-cache.md).
 - [ ] 10 — GQA versus MHA, including quality and actual cache storage. [Preregistered bounded adaptation](10-gqa.md).
-- [ ] 11 — Fused/chunked output loss, conditional on measured output-memory pressure.
+- [ ] 11 — Fused/chunked output loss, conditional on measured output-memory pressure. [Source review and gates](11-output-loss.md); distinguish the Triton kernel from the macOS compile implementation.
 - [ ] Final — Inspect 20 raw generations and memorization for accepted trained models;
   evaluate protected test only after selection; update technical README with measured results.
 
