@@ -1,4 +1,4 @@
-"""Research-only, request-local MHA cache for the O09 equivalence experiment."""
+"""Research-only, request-local cache for the O09/O10 equivalence experiments."""
 import torch
 from torch.nn import functional as F
 
@@ -12,8 +12,11 @@ class CacheSession:
         if model.training:
             raise ValueError("KV caching requires model.eval(); training stays uncached")
         for block in model.blocks:
-            if block.attention.qkv.out_features != 3 * model.config.n_embd:
-                raise ValueError("O09 currently supports the declared MHA projections only")
+            attention = block.attention
+            kv_heads = getattr(attention, "n_kv_head", attention.n_head)
+            expected_width = model.config.n_embd + 2 * kv_heads * (model.config.n_embd // attention.n_head)
+            if kv_heads < 1 or attention.n_head % kv_heads or attention.qkv.out_features != expected_width:
+                raise ValueError("Cache projection/head shapes do not match the declared MHA/GQA architecture")
         self.model = model
         self.layers = None
         self.length = 0
@@ -34,10 +37,11 @@ class CacheSession:
         for index, block in enumerate(model.blocks):
             attention = block.attention
             features = block.ln_attention(x)
-            q, k, v = attention.qkv(features).split(model.config.n_embd, dim=-1)
             dim = model.config.n_embd // attention.n_head
-            q, k, v = (value.view(batch, time, attention.n_head, dim).transpose(1, 2)
-                       for value in (q, k, v))
+            kv_heads = getattr(attention, "n_kv_head", attention.n_head)
+            q, k, v = attention.qkv(features).split((model.config.n_embd, kv_heads * dim, kv_heads * dim), dim=-1)
+            q = q.view(batch, time, attention.n_head, dim).transpose(1, 2)
+            k, v = (value.view(batch, time, kv_heads, dim).transpose(1, 2) for value in (k, v))
             if hasattr(attention, "cos"):
                 cos, sin = attention.cos[offset:offset + time], attention.sin[offset:offset + time]
                 q, k = rotate_pairs(q, cos, sin), rotate_pairs(k, cos, sin)
@@ -49,9 +53,14 @@ class CacheSession:
                 k = k.clone(memory_format=torch.contiguous_format)
                 v = v.clone(memory_format=torch.contiguous_format)
             layers.append((k, v))
+            attention_k, attention_v = k, v
+            if kv_heads != attention.n_head:
+                repeats = attention.n_head // kv_heads
+                attention_k = k.repeat_interleave(repeats, dim=1)
+                attention_v = v.repeat_interleave(repeats, dim=1)
             # Decode has one query and no future keys. A top-left rectangular
             # causal mask would incorrectly hide almost all cached positions.
-            attended = F.scaled_dot_product_attention(q, k, v, dropout_p=0.0,
+            attended = F.scaled_dot_product_attention(q, attention_k, attention_v, dropout_p=0.0,
                                                        is_causal=past is None)
             attended = attended.transpose(1, 2).contiguous().view(batch, time, model.config.n_embd)
             x = x + attention.output_dropout(attention.output(attended))

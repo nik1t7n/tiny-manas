@@ -146,6 +146,13 @@ Dynamic cache tensors own their storage, which will be measured separately from
 logical bytes. Read the PyTorch 2.13 SDPA mask semantics through Context7. No
 cached inference, parity result or speed measurement is claimed yet.
 
+**O10 source preparation:** the isolated GQA conversion pools each group of four
+K/V heads (including biases) into one, keeps eight Q heads and unchanged output
+weights, and stores only two K/V heads in the request cache. Explicit temporary
+head repetition before ordinary MPS SDPA is part of the chosen implementation,
+not a hidden fallback. Report persistent versus temporary bytes separately.
+Imports passed; conversion, MPS parity and adaptation remain unexecuted.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,

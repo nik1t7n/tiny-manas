@@ -2,6 +2,20 @@
 
 Status: preregistered, **not run**. Follow O09. Date: 2026-09-04.
 
+Prepared source, not executed: `scripts/gqa_candidate.py` converts a CPU copy of
+the selected MHA checkpoint. It preserves Q/output weights, pools K/V rows and
+biases in adjacent groups, and keeps RoPE buffers if present. The shared research
+cache stores only the declared KV-head count. Ordinary production attention and
+generation remain unchanged. No parity, speed or quality result is claimed.
+
+The preregistered MPS implementation explicitly repeats each of the two K/V
+heads four times immediately before ordinary eight-head SDPA. This is the
+reference GQA operation described in the [PyTorch 2.13 SDPA documentation](https://docs.pytorch.org/docs/2.13/generated/torch.nn.functional.scaled_dot_product_attention.html),
+not an unsupported-kernel recovery path. Persistent cache remains two-headed;
+temporary attention inputs are eight-headed. Account for these temporary
+allocations and timing instead of claiming a fourfold reduction in all attention
+memory or work. Native fused GQA is not assumed to exist on this MPS backend.
+
 ## Question and forecast
 
 Can eight query heads share two KV heads without losing useful prediction
