@@ -28,7 +28,7 @@ Only one generation runs at a time. A concurrent request receives HTTP 429 rathe
 Startup fails unless all of these conditions hold:
 
 - checkpoint, tokenizer, and service credential paths are configured;
-- checkpoint SHA-256 equals `cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1`;
+- checkpoint SHA-256 equals the configured expected hash (current optimized export: `4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494`);
 - tokenizer SHA-256 equals `5047b4f427bb1af1c06cfb9cefbe83790b56df409b137b887988db6eba4b159f`;
 - the configured device is exactly `cpu` or an available Apple `mps` device.
 
@@ -37,9 +37,9 @@ The model and tokenizer are loaded once through FastAPI's lifespan hook. The pro
 ## Required environment
 
 ```text
-MANAS_CHECKPOINT_PATH=/models/tiny-manas-27m.pt
+MANAS_CHECKPOINT_PATH=/models/tiny-manas-27m-bf16-20260904.pt
 MANAS_TOKENIZER_PATH=/models/kyrgyz-byte-bpe-v1.json
-MANAS_CHECKPOINT_SHA256=cc415e95a70d5b93a02042afdf96441b38ba529da2152febe16edc46a3c5f1a1
+MANAS_CHECKPOINT_SHA256=4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494
 MANAS_API_TOKEN=<stored deployment secret>
 MANAS_DEVICE=cpu
 ```
@@ -51,18 +51,26 @@ Model artifacts are mounted read-only at runtime. They are not copied into Git o
 ```bash
 uv sync --extra serving
 
-MANAS_CHECKPOINT_PATH=artifacts/tiny-manas-27m.pt \
+MANAS_CHECKPOINT_PATH=artifacts/tiny-manas-27m-bf16-20260904.pt \
 MANAS_TOKENIZER_PATH=data/tokenizer/kyrgyz-byte-bpe-v1.json \
 MANAS_API_TOKEN=local-only \
 MANAS_DEVICE=cpu \
 uv run uvicorn manas_gpt.service:app --host 127.0.0.1 --port 8765
 ```
 
-The accepted local CPU smoke returned health 200, rejected an unauthenticated generation with 401, and generated 16 real tokens at about 228 tokens/s on the development Mac.
+The original August 31 local CPU smoke returned health 200, rejected an unauthenticated generation with 401, and generated 16 real tokens at about 228 tokens/s on the development Mac. This is historical evidence, not a benchmark of the optimized release.
 
 ## Production record
 
-The accepted service is deployed from commit
+The September 4 optimization release, final evaluation and preserved rollback
+are tracked in [the release record](experiments/12-release.md). Generation uses
+an independent KV cache per request, with explicit window rebuilding when the
+256-token context fills. Evaluation and serving remain FP32. Health reports the
+verified checkpoint hash and enabled cache status.
+
+### Original August 31 deployment (retained for rollback)
+
+The original service was deployed from commit
 `43ed402cf506f1e263b17ebe99d7761b92474bed` as image
 `manas-gpt:43ed402cf506f1e263b17ebe99d7761b92474bed`. Its local OVH image ID is
 `sha256:0e429e7c7cd193053effcfe37ae7ca2e6972b49fdbccb3bed3ac7a86b888d962`.

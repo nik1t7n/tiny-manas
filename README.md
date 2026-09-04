@@ -816,7 +816,7 @@ The strongest next experiment would add legally usable Manas-only text from anot
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) records the decision history and rejected alternatives.
 - [`docs/SOURCES.md`](docs/SOURCES.md) pins data, tokenizer, implementation references, checksums, and licenses.
 - [`docs/experiments/README.md`](docs/experiments/README.md) tracks the optimization series, its individual reports and acceptance criteria.
-- [`reports/results.json`](reports/results.json) contains the machine-readable accepted metrics.
+- [`reports/results.json`](reports/results.json) contains the original experiment metrics; [`docs/experiments/accepted-state.json`](docs/experiments/accepted-state.json) records the selected optimized checkpoint, final test and current release.
 - [`reports/generation-audits`](reports/generation-audits) contains all fixed raw generations.
 
 Architecture references:

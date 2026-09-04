@@ -18,14 +18,53 @@ Tokenizer SHA-256:
 `5047b4f427bb1af1c06cfb9cefbe83790b56df409b137b887988db6eba4b159f`.
 All 17 frozen artifact files and the source archive passed a fresh hash check.
 
-## Release gate: pending
+## Deployment: completed; browser acceptance unavailable
 
-The owner explicitly authorized push and deployment. Build the exact committed
-source on the existing Linux CPU host, using PyTorch 2.13.0 (the currently
-deployed version), not a new paid training host. Update only the private `manas`
-component; preserve the website, authentication, limits and read-only mount.
-Verify the candidate with the real tokenizer/checkpoint, then verify a public
-generation through the website. No checkpoint download endpoint is introduced.
+The owner explicitly authorized push and deployment. Source commit
+`67afe940d1f38ba4e0712c0851c69317957ac8ac` was pushed and built from its exact
+tracked archive on the existing Linux CPU host. The CPU PyTorch version is
+pinned to 2.13.0, matching the prior deployment; no paid compute was provisioned.
+
+Current image: `manas-gpt:67afe940d1f38ba4e0712c0851c69317957ac8ac`.
+Image ID: `sha256:186db12d028a0b43f4d79c615accf050bdb943a4be2a19541f66832887022f1d`.
+Container: `manas-p5h6dziyjkyfejbiyqa8firs`; Docker health: **healthy**.
+Limits remain 1 GiB and two CPUs, with the model directory mounted read-only.
+Health reports the selected export hash, step 2,900, 26,877,696 parameters,
+context 256 and `kv_cache: true`.
+
+The isolated candidate loaded the real artifacts, returned health 200, rejected
+unauthenticated generation with 401 and generated 16 tokens. It was stopped and
+removed after the production replacement; no temporary server was left running.
+
+Coolify's raw Compose was patched through the existing write API, followed by
+the `MANAS_IMAGE` variable. The existing configuration writer regenerated the
+runtime files without starting the whole stack. A fail-closed comparison found
+only the model image, checkpoint path/hash and Coolify's shared `MANAS_IMAGE`
+metadata changed. The writer also injects that image-name variable into the site
+environment; no website code, credential or endpoint changed. Deployment used
+`docker compose up -d --no-deps --no-build --pull never manas`, not Coolify's
+whole-stack force-recreate action. The website container ID remained
+`e87cc87d02082bdc1f7cb5de265b58c99395f5e691ef6dbaf3e30eb1e1a1c59a`.
+
+A real request through `https://nik1t7n.com/api/manas/generate` returned HTTP 200,
+16 generated tokens and 42.77 tokens/s. This is one CPU smoke, **not** a controlled
+production speedup benchmark. The article returned HTTP 200 over public HTTPS.
+An initial smoke incorrectly supplied `seed` to the public proxy, which rejects
+unknown fields; it returned 422 as designed. Retrying the documented four-field
+public contract succeeded. The private service still supports an optional seed.
+Public rate limits, token limits and authentication were not relaxed.
+
+**Acceptance limitation:** local DNS could not resolve `nik1t7n.com`, including
+in the in-app browser (`ERR_NAME_NOT_RESOLVED`). Server-side DNS and public HTTPS
+worked. No browser UI/reload acceptance is claimed, and no resolver override or
+substitute page was used. The real public proxy-to-model path is verified;
+interactive browser acceptance remains to be checked when local DNS works.
+
+Operational transfer failures were corrected before cutover: the local rsync
+does not support `--chmod=F444`, so the real artifact was copied and chmodded
+on the server; the build log required a privileged redirect. Neither failure
+changed the running service. Source, artifact hashes and candidate gates passed
+before replacement.
 
 ## Preserved rollback
 
@@ -36,3 +75,8 @@ Previous checkpoint: `/models/tiny-manas-27m.pt`, SHA-256
 Keep both image and checkpoint. Rollback restores this image, checkpoint path
 and expected hash together in the existing Coolify service configuration, then
 recreates only `manas`.
+
+The pre-change runtime Compose and environment are retained in a root-only
+server directory at `/opt/manas-gpt/releases/67afe940d1f38ba4e0712c0851c69317957ac8ac-rollback`.
+Do not copy its environment file into Git or publish its contents. Both old and
+new images and checkpoint files remain available locally on OVH.

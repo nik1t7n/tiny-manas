@@ -28,9 +28,11 @@ only after selection. See [pause and recovery history](PAUSED.md).
 - [x] 11 — Fused/chunked output loss. [Assessed, not triggered](11-output-loss.md): no measured memory or output-loss bottleneck on the selected model; no runtime benchmark claimed.
 - [x] Final — Inspect 20 raw generations and memorization for accepted trained models;
   evaluate protected test only after selection; update technical README with measured results.
-- [ ] Release — Push the completed changes; deploy the accepted checkpoint and
+- [x] Release — Push the completed changes; deploy the accepted checkpoint and
   code to the existing private Tiny Manas service; verify public generation and
-  preserve the previous image/checkpoint for rollback.
+  preserve the previous image/checkpoint for rollback. [Release evidence](12-release.md):
+  healthy container and real public HTTPS generation passed; browser UI acceptance
+  remains unavailable because local DNS did not resolve the domain.
 
 ## Decision protocol
 

@@ -25,8 +25,16 @@ trigrams 4.0973%, maximum 31.1111%, longest normalized word match 9 words.
 All 17 frozen files and the original source archive were SHA-256 reverified.
 The new inference export is 107,547,815 bytes, SHA-256
 `4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494`.
-The original export is untouched. Next: bounded production release and actual
-public generation, with the old image and checkpoint retained for rollback.
+The original export is untouched.
+
+**Production release completed:** pushed and deployed source `67afe940d1f38ba4e0712c0851c69317957ac8ac`.
+Only `manas` was recreated; the website container stayed unchanged. Candidate
+startup/hash checks, unauthorized 401 and real generation passed. Production
+health is healthy and a request through the public website proxy returned 200
+with 16 generated tokens. Original image and checkpoint are retained. No new
+training runs remain active. Local DNS prevented browser UI acceptance; this is
+explicitly separate from the passed public HTTPS API flow. Full evidence and
+rollback details: [release record](experiments/12-release.md).
 
 **O08 completed after owner-authorized pause/resume:** all 3,000 updates finished;
 best scheduled checkpoint at 2,900. Independent 100-batch validation loss
