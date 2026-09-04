@@ -17,6 +17,18 @@ defines the causal mask as upper-left aligned. The candidate therefore uses
 causal attention during prompt prefill and no causal mask for a single new query
 over exclusively past/current keys. It rejects multi-token decode appends.
 
+Prepared driver: `scripts/experiment_kv_cache.py`, CLI parsing only. It requires
+the selected checkpoint hash and vocabulary, then checks all next-token logits
+and greedy choices for 20 real validation prompts: ten of length 32 and ten of
+length 248, each continued for 32 tokens. The latter exercise window rebuilding.
+It also checks independent request state, exact unique FP32 cache storage at
+256 positions, and the actual sampled generation wrapper with fixed seeds.
+Complete-generation measurements use 64 output tokens, alternating cached and
+uncached order, two warmup pairs and five measured pairs. Prompt prefill and
+single-token decode with 128 past positions have separate timings. Memory is
+sampled after timed calls, not described as the true allocator peak. No real
+inference measurements have been collected while the tokenizer sweep runs.
+
 ## Question and contract
 
 Can we avoid recomputing old tokens without changing what the model predicts?
