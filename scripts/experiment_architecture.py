@@ -1,4 +1,4 @@
-"""Full controlled O06-O08 training; execute only after the real probe passes."""
+"""Controlled architecture training, with an explicit staged quality follow-up."""
 import argparse
 from dataclasses import asdict
 import gc
@@ -45,6 +45,28 @@ def advance_sampler(sampler, count):
         torch.randint(0, len(sampler.tokens) - sampler.block_size, (sampler.batch_size,), generator=sampler.generator)
 
 
+def staged_decision(history, control):
+    """Budget heuristic, not a statistical claim about eventual convergence."""
+    step = len(history) * 100
+    if step not in (600, 900, 1200, 1500):
+        return None
+    deltas = [row["validation"]["loss"] - control[row["segment"] * 100]["validation"]["loss"]
+              for row in history]
+    recent, previous = statistics.mean(deltas[-3:]), statistics.mean(deltas[-6:-3])
+    improving = previous - recent
+    stop = False
+    reason = "Continue: advantage or a still-closing gap warrants the next stage"
+    if recent > .05 and min(deltas[-3:]) > .03 and improving < .01:
+        stop, reason = True, "Consistently worse validation without a closing gap"
+    elif step >= 900 and recent > -.02 and improving < .01:
+        stop, reason = True, "No material validation advantage or improving relative trend within the pilot budget"
+    elif step == 1500 and not (recent <= -.02 and max(deltas[-3:]) < 0):
+        stop, reason = True, "Pilot ceiling: insufficient consistent advantage to fund full training"
+    return {"step": step, "stop": stop, "reason": reason, "recent_mean_delta": recent,
+            "previous_mean_delta": previous, "relative_gap_improvement": improving,
+            "last_three_deltas": deltas[-3:], "interpretation": "budget decision, not proof of final inferiority"}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "configs/manas01-27m.toml")
@@ -53,11 +75,20 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--bootstrap-initial", action="store_true")
     parser.add_argument("--reference-initial", type=Path)
-    parser.add_argument("--change", choices=("rope", "rmsnorm", "swiglu"))
+    parser.add_argument("--change", choices=("control", "rope", "rmsnorm", "swiglu"))
     parser.add_argument("--probe", type=Path)
+    parser.add_argument("--quality-followup", action="store_true",
+                        help="Explicit owner-approved replacement of the old latency veto by staged validation gates")
+    parser.add_argument("--control-metrics", type=Path)
+    parser.add_argument("--control-calibration", type=Path)
     parser.add_argument("--stop-after-segment", type=int, default=30,
                         help="Pause at a saved epoch/100-update boundary; resume without this flag")
     args = parser.parse_args()
+    if args.quality_followup and (args.recipe != "random-windows" or args.change not in ("control", "rope", "rmsnorm")
+                                 or not args.control_metrics):
+        parser.error("Staged follow-up requires the original recipe, control metrics, and control/RoPE/RMSNorm")
+    if args.change == "control" and (not args.quality_followup or args.stop_after_segment != 1):
+        parser.error("Control is a bounded 100-update calibration only")
     if not 1 <= args.stop_after_segment <= 30:
         parser.error("--stop-after-segment must be in 1..30")
     config = load_config(args.config)
@@ -90,19 +121,39 @@ def main():
                                          "parameters": model.parameter_count()})
         print(f"INITIAL REFERENCE {out / 'initial-model.pt'}", flush=True)
         return
-    if not args.reference_initial or not args.change or not args.probe:
+    control = {}
+    if args.quality_followup:
+        rows = [json.loads(line) for line in args.control_metrics.read_text().splitlines()]
+        control = {row["step"]: row for row in rows if row["kind"] == "evaluation"}
+        if set(control) != set(range(100, 3001, 100)):
+            raise ValueError("The original control curve must cover all 30 evaluation points")
+        protocol.update(early_stopping="staged-validation-v1: 600/900/1200/1500; see docs/experiments/13-quality-followup.md",
+                        control_metrics_sha256=sha(args.control_metrics), generation_cache=False)
+        if args.change != "control":
+            if not args.control_calibration:
+                parser.error("Candidates require a successful fresh control calibration")
+            calibration = json.loads(args.control_calibration.read_text())
+            if (calibration["status"] != "calibration_passed"
+                or calibration["protocol"]["control_metrics_sha256"] != sha(args.control_metrics)
+                or any(calibration["protocol"][key] != protocol[key]
+                       for key in ("runner_sha256", "model_source_sha256", "training_helpers_sha256"))
+                or calibration["protocol"]["reference_initial_sha256"] != sha(args.reference_initial)):
+                raise RuntimeError("Control calibration provenance differs")
+            protocol["control_calibration_sha256"] = sha(args.control_calibration)
+    if not args.reference_initial or not args.change or (args.change != "control" and not args.probe):
         parser.error("Full training requires --reference-initial, --change and a passed --probe")
-    gate = json.loads(args.probe.read_text())
-    if (gate.get("status") != "cost_gate_passed_quality_pending" or gate.get("vocabulary") != args.vocabulary
+    gate = json.loads(args.probe.read_text()) if args.probe else None
+    accepted_statuses = ("cost_gate_passed_quality_pending", "cost_gate_failed") if args.quality_followup else ("cost_gate_passed_quality_pending",)
+    if gate and (gate.get("status") not in accepted_statuses or gate.get("vocabulary") != args.vocabulary
         or gate.get("change") != args.change or gate.get("reference_initial_sha256") != sha(args.reference_initial)):
         raise RuntimeError("The real numerical/cost probe must pass for this vocabulary")
     source = Path(__file__).with_name("rotary_candidate.py" if args.change == "rope" else "architecture_candidates.py")
-    if gate.get("candidate_sha256") != sha(source):
+    if gate and gate.get("candidate_sha256") != sha(source):
         raise RuntimeError("Candidate source changed after its real probe")
     for key in ("model_source_sha256", "training_helpers_sha256"):
-        if gate.get(key) != protocol[key]:
+        if gate and gate.get(key) != protocol[key]:
             raise RuntimeError(f"Source changed after the probe: {key}")
-    if gate.get("config_sha256") != config.sha256:
+    if gate and gate.get("config_sha256") != config.sha256:
         raise RuntimeError("Configuration changed after the probe")
     reference_payload = torch.load(args.reference_initial, map_location="cpu", weights_only=False)
     if reference_payload.get("artifact_kind") != "fresh_initialization":
@@ -112,8 +163,8 @@ def main():
         raise ValueError("Reference initialization uses a different recipe or vocabulary")
     if args.change in reference_protocol["architecture_changes"]:
         raise ValueError("The requested change is already present")
-    protocol.update(architecture_changes=reference_protocol["architecture_changes"] + [args.change],
-                    reference_initial_sha256=sha(args.reference_initial), probe_sha256=sha(args.probe))
+    protocol.update(architecture_changes=reference_protocol["architecture_changes"] + ([] if args.change == "control" else [args.change]),
+                    reference_initial_sha256=sha(args.reference_initial), probe_sha256=sha(args.probe) if args.probe else None)
     if (out / "result.json").exists():
         done = json.loads((out / "result.json").read_text())
         if done["protocol"] != protocol or done["checkpoint_sha256"] != sha(out / "best-model.pt"):
@@ -121,7 +172,7 @@ def main():
         print(f"REUSE {out}", flush=True)
         return
     reference = restore_model(reference_payload)
-    model = apply_change(reference, args.change)
+    model = restore_model(reference_payload) if args.change == "control" else apply_change(reference, args.change)
     del reference, reference_payload
     if (out / "initial-model.pt").exists():
         saved_initial = torch.load(out / "initial-model.pt", map_location="cpu", weights_only=False)
@@ -175,7 +226,7 @@ def main():
             updates = random_updates()
         else:
             updates = data.training_updates(segment)
-        durations, losses = [], []
+        durations, losses, calibration_samples = [], [], []
         memory = {"allocated": 0, "driver": 0}
         start = time.perf_counter()
         for index, item in enumerate(updates):
@@ -184,6 +235,10 @@ def main():
                 group["lr"] = lr
             tick = time.perf_counter()
             loss, _ = update(model, optimizer, item["batches"], device, memory)
+            if args.change == "control" and index + 1 in (1, 20, 40, 60, 80, 100):
+                old = next(row for row in rows if row["kind"] == "train" and row["step"] == index + 1)
+                calibration_samples.append({"step": index + 1, "loss": loss, "old_loss": old["loss"],
+                                            "absolute_difference": abs(loss - old["loss"])})
             durations.append(time.perf_counter() - tick)
             losses.append((loss, item["targets"]))
             consumed += item["bytes"]
@@ -207,6 +262,26 @@ def main():
         checkpoint(out / "resume.pt", model, optimizer, protocol, history, best, consumed)
         save_json(out / "history.json", history)
         print(f"SEGMENT {args.change} {segment + 1}/30 score={score:.6f} seconds={training_seconds:.1f} best={best['segment']}", flush=True)
+        if args.change == "control":
+            differences = {"train": abs(train_evaluation["loss"] - control[100]["train"]["loss"]),
+                           "validation": abs(score - control[100]["validation"]["loss"])}
+            passed = max(differences.values()) <= .003 and max(r["absolute_difference"] for r in calibration_samples) <= .005
+            save_json(out / "result.json", {"status": "calibration_passed" if passed else "calibration_failed",
+                      "protocol": protocol, "differences": differences, "samples": calibration_samples,
+                      "checkpoint_sha256": sha(out / "best-model.pt")})
+            if not passed:
+                raise RuntimeError("Fresh control diverged from historical control; do not reuse its curve")
+            print("CALIBRATION PASSED", flush=True)
+            return
+        decision = staged_decision(history, control) if args.quality_followup else None
+        if decision:
+            save_json(out / f"decision-{(segment + 1) * 100}.json", decision)
+            print(f"DECISION {json.dumps(decision)}", flush=True)
+            if decision["stop"]:
+                save_json(out / "result.json", {"status": "stopped_by_quality_budget", "protocol": protocol,
+                          "decision": decision, "history": history, "best": best,
+                          "checkpoint_sha256": sha(out / "best-model.pt")})
+                return
     if len(history) < 30:
         print(f"PAUSED {out} after {len(history)} saved segments; full quality result pending", flush=True)
         return
@@ -223,7 +298,7 @@ def main():
         independent = evaluate_random_batches(model, RandomWindowSampler(validation_tokens, 8, 256, 1837), device, 100)
     else:
         independent = final_validation
-    audit = generation_audit(model, data, device, out / "generation-audit.json")
+    audit = generation_audit(model, data, device, out / "generation-audit.json", use_cache=not args.quality_followup)
     result = {"status": "completed_not_promoted", "protocol": protocol, "best": best, "history": history,
               "validation": independent, "exact_byte_validation": final_validation, "audit": audit,
               "parameters": model.parameter_count(), "checkpoint_sha256": sha(out / "best-model.pt"),

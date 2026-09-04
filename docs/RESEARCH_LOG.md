@@ -2,6 +2,17 @@
 
 Forecasts are written before each run. Failed runs and wrong predictions remain in chronological order.
 
+## O06/O07 quality follow-up — 2026-09-04
+
+Owner-approved reopening: a 10–15% latency cost must not substitute for a quality
+measurement. The preregistered [staged protocol](experiments/13-quality-followup.md)
+uses a 100-update control calibration, then one-change RoPE/RMSNorm arms with a
+600-update grace period and bounded continuation decisions. Reuse the original
+matched control curve only if calibration passes. Keep the full learning-rate
+horizon and resumable states. Hypothesis: RMSNorm approximately ties; RoPE might
+improve relative-position learning. Falsifier: consistent held-out improvement.
+No test-set selection or production replacement based on a pilot.
+
 ## Optimization series — 2026-09-04
 
 **O10 completed and rejected:** Q8/KV2 reduced the persistent FP32 cache from

@@ -178,7 +178,7 @@ def checkpoint(path, model, optimizer, provenance, history, best, consumed):
 
 
 @torch.no_grad()
-def generation_audit(model, data, device, output):
+def generation_audit(model, data, device, output, *, use_cache=True):
     model.eval()
     corpus_path = BUNDLE / "train.txt"
     if sha(corpus_path) != data.manifest["files"]["train.txt"]:
@@ -190,7 +190,8 @@ def generation_audit(model, data, device, output):
             prompt_ids = data.tokenizer.encode(prompt, add_special_tokens=False).ids
             ids = torch.tensor([prompt_ids], dtype=torch.long, device=device)
             started = time.perf_counter()
-            generated = model.generate(ids, 256, .8, 40, torch.Generator(device=device).manual_seed(seed))
+            generated = model.generate(ids, 256, .8, 40, torch.Generator(device=device).manual_seed(seed),
+                                       use_cache=use_cache)
             torch.mps.synchronize()
             elapsed = time.perf_counter() - started
             all_ids = generated[0].tolist()
