@@ -1,6 +1,6 @@
 # 08 — A budget-matched SwiGLU feed-forward network
 
-Status: **correctness/cost gate passed; full quality run pending**. Date: 2026-09-04.
+Status: **correctness/cost gate passed; full quality run in progress**. Date: 2026-09-04.
 The setup below is the preregistered plan; measured results follow it.
 
 Prepared candidate: `scripts/architecture_candidates.py::with_swiglu`. It copies
@@ -105,3 +105,23 @@ validation batches, seed 1837, FP32: it must improve on 4.3457791471 by at least
 0.02 nats (at most **4.3257791471**) and show no obvious new collapse in the
 20-output audit. Test remains unopened. First retain one 100-update segment,
 inspect it, then resume the same run to all 3,000 updates.
+
+## Active full run and recovery
+
+Run: `runs/optimization-08-swiglu-full-20260904`. Its first real segment finished
+100 updates with finite metrics: training mean 8.371669, scheduled validation
+7.135576, 33.0563 training-only seconds. The saved optimizer has step 100 for
+every initialized state; CPU/MPS RNG states are present (5056/44 bytes). This is
+a resume-path smoke, not a quality result. The next invocation resumes the same
+run without `--stop-after-segment 1`; do not repeat these completed updates.
+
+Candidate initial-state SHA-256:
+`272787d1832a15a2b1f4811874f0ccd29f67cb70abca0ae781e5de727b767190`.
+Source/config/reference/probe hashes are embedded in `provenance.json` and
+checkpoints. A changed model/helper/config must not silently resume this run.
+No KV-cache/GQA GPU run may start until this training and final audit complete.
+
+The full runner reports training-only time separately from evaluation/checkpoint
+overhead. Do not compare that narrower timing field against O02's entire training
+loop and call the difference a SwiGLU speed gain. The controlled 35-update probe
+is the architectural cost comparison; full training determines quality.

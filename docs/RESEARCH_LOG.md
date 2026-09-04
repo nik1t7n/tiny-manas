@@ -164,6 +164,13 @@ control and train fresh SwiGLU for the original 3,000-update budget. Require
 independent validation loss <=4.3257791471 and a clean 20-output qualitative
 comparison before promotion. Begin with one retained/resumable 100-update segment.
 
+**O08 full driver smoke passed:** the first 100 updates completed and were saved,
+with optimizer step 100 and CPU/MPS RNG states intact. The same run was resumed
+without the pause flag; its initial-state hash is recorded in report 08. Full
+quality/audit remain pending. No competing KV/GQA GPU work may start yet. Keep
+full-driver training-only timing separate from O02's wider loop-wall-time field;
+use the controlled probe for architectural speed attribution.
+
 **O06–O08 execution preparation while 16k trains:** added a shared full-run
 driver with explicit original-random/equal-byte recipes, hashed initial states,
 probe provenance gates and resumable segment checkpoints. RoPE's prepared probe
