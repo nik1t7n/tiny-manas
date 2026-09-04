@@ -13,6 +13,15 @@ queued real probe. No manual-formula or CPU fallback will hide an unsupported
 operation. The [PyTorch API documentation](https://docs.pytorch.org/docs/2.13/generated/torch.nn.RMSNorm.html)
 confirms the scale parameter and epsilon interface; it does not prove a speedup.
 
+Prepared execution: `scripts/experiment_architecture_probe.py --change rmsnorm`
+checks native output, input gradients and scale gradients against the explicit
+formula on actual first-block features (FP32, atol/rtol 1e-4). A neighboring
+token's real features supply the upstream derivative, avoiding a derivative
+direction that is trivial under normalization. Then both fresh arms receive
+35 identical updates, with five excluded from timing. Full quality training
+uses the shared resumable driver only after that gate passes. CLI parsing is
+the only verification performed so far; the MPS checks remain queued.
+
 ## Question and forecast
 
 Is centering each token's features useful enough here to justify its cost?

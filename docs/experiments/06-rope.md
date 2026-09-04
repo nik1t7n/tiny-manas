@@ -4,7 +4,7 @@ Status: preregistered, **not run**. Execute after experiment 05 selects its
 tokenizer. Date: 2026-09-04.
 
 Preparation while O05 runs: `scripts/rotary_candidate.py` contains the isolated
-candidate, and `scripts/experiment_rope_probe.py` contains its real-data numerical
+candidate, and `scripts/experiment_architecture_probe.py --change rope` contains its real-data numerical
 and cost gate. Neither changes the accepted model or loads into the ordinary
 checkpoint path. Only command-line parsing has been checked; do not interpret
 prepared code as a successful RoPE experiment. No concurrent GPU probe is allowed.
@@ -95,6 +95,11 @@ resume the same run without the pause flag. That verifies the training path
 without throwing away its first updates. Final output/audit and promotion remain
 pending all 30 segments. No bootstrap, MPS probe or architectural training has
 started while O05 owns the GPU.
+
+The shared probe also supports `--change rmsnorm` and `--change swiglu` for
+O07/O08. Both probe and full run require an artifact explicitly marked
+`fresh_initialization`; a trained checkpoint cannot be passed off as the fresh
+control. Each change retains its own numerical checks and latency ceiling.
 
 ## Correctness and acceptance
 

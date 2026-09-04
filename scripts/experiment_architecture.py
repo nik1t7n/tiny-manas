@@ -22,7 +22,8 @@ def save_initial(path, model, protocol):
     if path.exists():
         raise FileExistsError(f"Refusing to overwrite an initial state: {path}")
     temp = path.with_suffix(".pt.tmp")
-    torch.save({"model": {key: value.detach().cpu() for key, value in model.state_dict().items()},
+    torch.save({"artifact_kind": "fresh_initialization",
+                "model": {key: value.detach().cpu() for key, value in model.state_dict().items()},
                 "model_config": asdict(model.config), "protocol": protocol}, temp)
     temp.replace(path)
 
@@ -104,6 +105,8 @@ def main():
     if gate.get("config_sha256") != config.sha256:
         raise RuntimeError("Configuration changed after the probe")
     reference_payload = torch.load(args.reference_initial, map_location="cpu", weights_only=False)
+    if reference_payload.get("artifact_kind") != "fresh_initialization":
+        raise ValueError("A trained checkpoint cannot substitute for the fresh reference initialization")
     reference_protocol = reference_payload["protocol"]
     if reference_protocol["recipe"] != args.recipe or reference_protocol["vocabulary"] != args.vocabulary:
         raise ValueError("Reference initialization uses a different recipe or vocabulary")

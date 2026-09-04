@@ -121,6 +121,13 @@ now consumes the same pinned initialization and selected sampler. Only CLI
 parsing has run. The first real full-driver segment will be retained and resumed,
 not discarded as a separate short training run. No architecture has been adopted.
 
+The numerical/cost entry point is now `experiment_architecture_probe.py`, with
+separate RoPE, RMSNorm and SwiGLU gates and one matched timing loop. Fresh
+initialization artifacts carry an explicit type marker required by both runners.
+The RMSNorm gate checks input/scale gradients as well as outputs; SwiGLU checks
+its formula, initialization budget and projection gradients. CLI parsing passed;
+these are prepared checks, not results from the GPU.
+
 **O06 preparation (not executed):** read RoFormer's rotation construction and
 registered [06-rope.md](experiments/06-rope.md). Keep context 256 and compare
 fresh matched models after tokenizer selection. Require a measured quality gain,

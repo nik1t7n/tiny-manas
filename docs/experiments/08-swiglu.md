@@ -11,6 +11,13 @@ at zero. The candidate rejects widths that cannot preserve the exact matrix
 budget rather than rounding without disclosure. No candidate training or MPS
 probe has run; source preparation is not an acceptance result.
 
+Prepared execution: `scripts/experiment_architecture_probe.py --change swiglu`
+checks the explicit formula on actual post-attention features, the exact matrix
+budget, initialization scales and zero biases. The first real update must give
+nonzero gradients to all three projections. The shared 35-update comparison
+excludes five warmup updates; a passed cost gate is followed by the complete
+matched training run, not treated as a quality result. Only CLI parsing has run.
+
 ## Question and forecast
 
 Can a learned multiplicative gate improve held-out prediction without simply
