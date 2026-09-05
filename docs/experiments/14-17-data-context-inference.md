@@ -387,3 +387,23 @@ Total new training in O15/O16: 7,500 updates, 30,720,000 targets, and 2,999.58
 seconds in the training-loop subtotals. Data preparation, evaluation, and saving
 are outside that subtotal. No paid compute, new SFT, quantization, request
 batching, attention backend, or runtime upgrade was introduced.
+
+### Publication and site-only release
+
+The completed research, results, decisions, and paper sources were committed and
+pushed. Site source `af18627a4b70be3020244d35365a7973ba61fdce` updates only the
+experimental second part of the Russian and English essay; Part I is unchanged
+byte-for-byte. The exact source was built on OVH and accepted through an isolated
+candidate, a configuration-diff guard, and a site-only cutover.
+
+The public article passed EN/RU navigation and Russian deep-link reload. One
+real browser generation returned 16 tokens (0.4 seconds displayed). The model
+container remained `8f30e0f589b154cc819566ed6ffbe31149c3e26efa7571f5cf37c10341623a2b`
+on release `437195fb1a109e3ff392aaae7c4c350518b9df76`; no model restart or weight
+replacement occurred. The temporary website candidate was removed. The site
+repository's `docs/OVH_PRODUCTION.md` records the exact site image and rollback.
+
+The owner's subsequent paper feedback changes presentation, not these research
+records: the manuscript now describes architecture, mechanics, and engineering
+evidence in an impersonal academic structure without a chronological experiment
+catalogue. Numerical source files and historical decisions remain intact.
