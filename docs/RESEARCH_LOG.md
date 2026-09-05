@@ -2,6 +2,21 @@
 
 Forecasts are written before each run. Failed runs and wrong predictions remain in chronological order.
 
+## O14–O17 — 2026-09-05: data, context, and inference
+
+The owner authorized only four follow-up experiments and conditional release.
+The [preregistered protocol](experiments/14-17-data-context-inference.md) records
+hypotheses, resource budgets, matched comparisons, stopping rules, and promotion
+thresholds before observing new model scores. Current source discovery finds
+one Manas edition in the licensed UdS archive; external Orozbakov/Mamay books
+are candidates pending rights and extraction checks. Their availability is not
+treated as training permission. No new corpus has yet been admitted.
+
+Forecast: cleaner/additional in-domain text has the best chance of improving
+quality; context 512 may help RoPE but remains uncertain; BF16 inference may
+save MPS memory with small prediction drift. Data or quality failures remain
+recorded outcomes, not reasons to silently substitute a different experiment.
+
 ## O06/O07 quality follow-up — 2026-09-04
 
 **Research completed:** the fresh 100-update control reproduced validation within
