@@ -4,6 +4,15 @@ Status: protocol registered before new model scores are observed.
 Date: September 5, 2026. Owner authorized execution, documentation, conditional
 promotion, repository/website updates, and revision of the existing paper.
 
+Source authorization clarification, before new-corpus training: the owner
+confirmed permission/access to use the Orozbakov and Jusup Mamay editions for
+this student research. Admit those sources on that explicit authorization and
+retain source/edition attribution. This is not a claim that the scanned editions
+have an independently verified public-domain or Creative Commons license. Keep
+raw books, extracted text, token arrays, and full continuations out of Git.
+The earlier source-license gate is resolved for these specifically named books;
+extraction quality, duplicate separation, and model-quality gates remain.
+
 ## Scope and baseline
 
 Only four experiments are in scope: O14 data and evaluation; O15 training the
@@ -46,6 +55,56 @@ test is reserved for post-selection reporting; historical test reuse remains
 disclosed. All candidates use exactly the same evaluation targets.
 
 ## O15: unchanged architecture on the admitted corpus
+
+### O14 freeze, before O15 scores
+
+Coordinate extraction reads Poppler word boxes, rejoins glyph fragments by their
+horizontal gap, and removes small-type editorial apparatus, counters, and source
+watermarks. It preserves verse newlines and punctuation. No generative repair or
+guessed spelling correction is used. Visual source checks cover Orozbakov book 2
+page 120, book 3 page 120, book 4 page 100, and book 5 page 280; section starts and
+ends are also checked against contents and extracted text. Residual OCR errors
+remain, particularly near dense superscript annotations. This is an OCR-derived
+corpus experiment, not a claim of philologically corrected transcription.
+
+Frozen PDF-page ranges (inclusive): books 2: 17–380, 3: 10–299, 5: 18–561 train;
+book 4: 16–332 validation; Mamay: 29–1040 test (closing publisher credit removed).
+Books 1, 6–7, and 8–9 are downloaded but excluded from this bounded pass because
+of dense apparatus or multi-column/glyph extraction problems. Books from the
+same Orozbakov academic edition remain related sources. Mamay is a different
+narrator; it is held out from language-model training, not certified unseen by
+the historical tokenizer.
+
+Training contains the original 418,562 tokens plus 110,252 / 91,367 / 141,783
+tokens from books 2 / 3 / 5: 761,964 total, including 343,402 new tokens.
+Validation book 4 contains 99,630 tokens; Mamay contains 408,359. Every complete
+text passes byte-exact tokenizer round trip with zero replacement characters.
+Bytes/token: original 6.987; books 2/3/4/5 6.240/6.199/6.168/6.288; Mamay 5.053.
+Casefolded exact 32-word screening against all new and original holdouts, then
+earlier training sources, finds zero matching spans to remove. This does not
+exclude near-duplicates, short epic formulas, or OCR-obscured copies.
+
+The expanded arm samples exactly half its windows from original training and
+half from the three new volumes, proportional to eligible window starts. Windows
+never cross a source or pruned boundary. The old-data arm uses the same original
+training tokens only. Sampling consumes equal target counts, not equal epochs;
+the treatment also introduces preserved verse newlines absent from the flattened
+old source. These are jointly a data-treatment experiment, not a pure narrator
+ablation.
+
+Selection primary: 256 deterministic, evenly spaced, nonoverlapping target spans
+of up to 128 tokens throughout book 4, after a 512-token context-only prefix.
+The exact positions and byte denominators are in the frozen run manifest.
+Familiar control: every original validation target after its 512-token prefix.
+Context 256 and 512 score identical targets, with respectively 129–256 and
+385–512 preceding tokens for full spans. Each retained target is scored once.
+Final reporting additionally scores the complete book-4 remainder and the held-out
+Mamay remainder; test does not guide selection. Do not compare this new BPB
+denominator directly with the earlier O05 byte-window score.
+
+Bundle: `runs/data-evaluation-20260905/bundle/manifest.json`; raw sources, texts,
+token arrays, and full continuations remain local and ignored by Git. All run
+protocols record hashes of the bundle, initializer, runner, and relevant helpers.
 
 Proceed only after O14 supplies a frozen admissible training/evaluation bundle.
 Compare a fresh old-data control and fresh new-data arm with identical shared

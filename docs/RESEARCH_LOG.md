@@ -7,15 +7,34 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 The owner authorized only four follow-up experiments and conditional release.
 The [preregistered protocol](experiments/14-17-data-context-inference.md) records
 hypotheses, resource budgets, matched comparisons, stopping rules, and promotion
-thresholds before observing new model scores. Current source discovery finds
-one Manas edition in the licensed UdS archive; external Orozbakov/Mamay books
-are candidates pending rights and extraction checks. Their availability is not
-treated as training permission. No new corpus has yet been admitted.
+thresholds before observing new model scores. Source discovery found one Manas
+edition in the licensed UdS archive. The owner explicitly authorized research
+use of the Orozbakov/Mamay editions; this does not assert a blanket public
+redistribution license. O14 has frozen three additional training volumes,
+Orozbakov book 4 as validation, and Mamay as final test. Coordinate-based PDF
+extraction, exact tokenizer round trips, and 32-word duplicate screening are
+recorded in the protocol. The admitted training bundle has 761,964 tokens;
+residual OCR errors remain a stated limitation. Original splits are unchanged.
 
 Forecast: cleaner/additional in-domain text has the best chance of improving
 quality; context 512 may help RoPE but remains uncertain; BF16 inference may
 save MPS memory with small prediction drift. Data or quality failures remain
 recorded outcomes, not reasons to silently substitute a different experiment.
+
+O15 execution started with a fresh old-data control, common initialization and
+the full 3,000-update cosine horizon. No historical curve is silently reused:
+the new document-aware sampler and fixed book evaluation require this control.
+Exact commands and source hashes are retained in run protocols. Initial book
+validation is much harder than the familiar suffix; the treatment includes
+verse newlines absent from the old flattened source. This format shift will
+remain part of the interpretation rather than being corrected after scores.
+
+O17's independent screen on the still-deployed RoPE checkpoint completed first:
+BF16 validation drift was only +0.00002403 nats and cache/numerical gates passed,
+but short-prompt generation became 18.73% slower. Near-overflow improvement was
+only 3.1%, below the 5% gate. No generation audit was spent after that performance
+failure. FP32 inference remains selected. If O15/O16 changes the final weights,
+the selected new checkpoint requires its own O17 comparison.
 
 ## O06/O07 quality follow-up — 2026-09-04
 
