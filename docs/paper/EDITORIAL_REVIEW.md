@@ -1,6 +1,39 @@
 # Curated editorial and presentation review
 
-## September 5 update
+## Academic rewrite: September 5, current version
+
+The manuscript is now organized around the model rather than the author's
+learning process. Architecture, tensor operations, attention, RoPE, normalization,
+regularization, and the training objective precede computational choices and
+empirical comparisons. The personal introduction, decision reversals, numbered
+experiment catalogue, debugging stories, and release mechanics were removed.
+Results are grouped by capacity/position/features, vocabulary, source transfer,
+and generated text. Partial training budgets and incompatible scoring protocols
+remain explicit without reproducing the internal selection diary.
+
+Humanizer was applied in neutral technical file mode; no first-person voice was
+added. The primary Transformer, LLaMA, and TinyLlama papers supplied structural
+references, while numerical claims still come only from the saved Tiny Manas
+measurements. The corpus tables distinguish model training from tokenizer
+training, and the transfer results remain attributed to the correct checkpoint.
+
+The current manuscript contains 12 pages, three vector figures, nine tables,
+nine numbered equations, and twelve cited references. The three figure labels
+describe components and datasets rather than stages in a decision history.
+All raw CSV/JSON evidence is unchanged. The source build and final page-by-page
+visual check cover formulas, tables, diagrams, glyphs, and bibliography placement;
+they do not constitute a new model-quality study.
+
+Final verification: all twelve rendered pages were inspected. The Tectonic
+build has no undefined references, missing characters, overfull boxes, or
+underfull boxes; all PDF fonts are embedded. Formula numbering and references
+are complete, tables and diagrams fit within the text area, and the document
+ends with References. No personal pronouns or E/O experiment identifiers remain
+in the manuscript. Previous rendered versions are not the delivered output.
+
+The following sections are historical reviews, not the current writing brief.
+
+## Earlier September 5 update
 
 The follow-up revision retains the same style and author voice. It adds O14-O17
 and revises the abstract, data limitations, and conclusion to match the completed

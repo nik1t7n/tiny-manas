@@ -3,8 +3,11 @@
 **Training Tiny Manas: A Small Language Model for a Kyrgyz Epic**  
 Nikita Nosov · September 5, 2026 · Independent technical report
 
-The manuscript reconstructs E0-E5, O00-O17, corrected measurement failures,
-the quality follow-up, new book-level evaluation, and the retained native RoPE model. It is not a
+The manuscript describes the final model's architecture and mathematics, data,
+training, computational implementation, and empirical design tradeoffs. It uses
+an impersonal academic register rather than a chronological experiment diary.
+Personal motivation, debugging narratives, experiment identifiers, and release
+operations are excluded; detailed histories remain in the research records. It is not a
 NeurIPS acceptance claim or an arXiv submission. It uses the official NeurIPS
 2026 `preprint` style; the main report is deliberately longer than the
 conference's nine-page submission limit.
@@ -13,7 +16,9 @@ conference's nine-page submission limit.
 
 - `main.tex`: manuscript and bibliography; the PDF ends at References.
 - `neurips_2026.sty`: unmodified official template; attribution retained.
-- `figures/*.pdf`: six original vector figures with embedded Arial fonts.
+- `figures/*.pdf`: original vector figures with embedded Arial fonts. The current
+  manuscript uses three: architecture, cached decoding, and source-transfer curves.
+  Three earlier plots remain available as supporting assets.
 - `data/*.csv`: observed training/evaluation curves and per-sample audit metrics.
 - `data/evidence.json`: extracted numerical evidence and hashes of 25 source
   artifacts. No model tensors, licensed corpus payloads, or full continuations.
@@ -66,7 +71,8 @@ incorporates the owner's separately authorized new research: two complete
 3,000-update data arms, a context-512 run stopped at 1,500, the inference screen,
 and final fixed-target scoring. The evidence collectors themselves never train
 or call a model. Historical metrics and original artifacts remain unchanged.
-Single-seed uncertainty, adaptive validation, OCR and formatting differences,
+The subsequent academic rewrite reorganizes this evidence without new model
+runs or changed numerical data. Single-seed uncertainty, adaptive validation, OCR and formatting differences,
 historical test reuse, allocator sampling, and incompatible timing denominators
 are explicit in the manuscript.
 

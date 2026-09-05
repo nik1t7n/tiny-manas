@@ -74,7 +74,7 @@ def plus(c, x, y):
 
 def architecture():
     c = new("architecture.pdf", 396, 420)
-    text(c, 91, 405, "(a) Current decoder", 9, True, align="center")
+    text(c, 91, 405, "(a) Decoder architecture", 9, True, align="center")
     text(c, 286, 405, "(b) Inside causal attention", 9, True, align="center")
     x = 94
     # Outer boundary conveys repetition; residuals bypass normalization too.
@@ -198,7 +198,7 @@ def cache():
     box(c,335,84,108,30,"Old states are invalid\nfor exact crop parity", "#F5E2D7",7.4)
     for x in [67,202,335]:arrow(c,[(x,116),(x,100)])
     text(c,198,40,"Cache state belongs to one request; training has no KV cache.",8,align="center")
-    text(c,198,20,"MHA: 6 MiB     GQA candidate: 1.5 MiB     (FP32, one full request)",8,True,align="center")
+    text(c,198,20,"MHA: 6 MiB     GQA (2 KV heads): 1.5 MiB     (FP32, one full request)",8,True,align="center")
     c.save()
 
 
@@ -220,8 +220,9 @@ def followup():
         for name, col, dash in styles:
             series(c, runs[name], "step", key, pt, col, dash)
     context_mixture = evidence["runs"]["context512"]["protocol"]["mixture"]
-    for x, label, col, dash in [(15, "Old / 256", GREY, (1, 2)), (133, "Expanded / 256", TEAL, False),
-                               (278, f"{context_mixture.title()} / 512", RUST, (6, 2))]:
+    context_label = "Original" if context_mixture == "old" else context_mixture.title()
+    for x, label, col, dash in [(15, "Original / 256", GREY, (1, 2)), (133, "Expanded / 256", TEAL, False),
+                               (278, f"{context_label} / 512", RUST, (6, 2))]:
         line(c, [(x, 14), (x+15, 14)], col, 1.5, dash)
         text(c, x+20, 11, label, 7.3)
     c.save()

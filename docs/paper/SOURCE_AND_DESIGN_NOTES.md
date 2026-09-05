@@ -1,5 +1,25 @@
 # Primary sources and document design
 
+## Academic structure revision: September 5
+
+The owner requested a model-centered academic paper without personal narrative
+or a chronological experiment catalogue. The current structure is architecture
+and mathematics, data/training, computational implementation, empirical design
+comparisons, limitations, and conclusion. It was informed by fresh reading of
+[Attention Is All You Need](https://arxiv.org/html/1706.03762v7),
+[LLaMA](https://arxiv.org/html/2302.13971v1), and
+[TinyLlama](https://arxiv.org/html/2401.02385v2), especially the separation of
+model specification, optimization, implementation, and results. This is a
+structural reference, not a claim that those papers validate Tiny Manas.
+
+The manuscript now uses three existing vector assets: architecture, cache, and
+data/context curves. Labels were made model-centered; plotted measurements,
+scales, and numerical source files are unchanged. Historical pilot, tokenizer,
+and staged-quality figures remain supporting assets but are not included in the
+current paper. The records below describe the earlier figure and scope choices.
+
+## Earlier extension and source review
+
 September 5 extension: O14 source PDFs and permissions are documented in
 `../SOURCES.md` and the O14-O17 protocol. `data/followup-evidence.json` records
 the new measurements separately from the historical snapshot. A sixth vector

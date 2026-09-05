@@ -1,6 +1,26 @@
-# Tiny Manas retrospective paper
+# Tiny Manas technical paper
 
-## September 5 extension: completed
+## Academic rewrite: September 5
+
+The owner's current brief supersedes the earlier first-person retrospective
+scope below. Describe the final architecture and mechanics first, then the data,
+training, computation, and measured reasons for the engineering choices.
+Remove personal history, experiment-ID headings, debugging incidents, revised
+selection-policy stories, and operational release details from the manuscript.
+Keep the actual results, comparison conditions, and limits of partial budgets.
+
+The rewrite uses the method/result organization of the primary Transformer,
+LLaMA, and TinyLlama papers as structural references. It does not copy their prose
+or borrow their performance claims. Three figures support the architecture,
+cache mechanics, and source-transfer analysis; earlier supporting plots and
+numerical files remain in the repository. References stay last; appendices and
+acknowledgments remain absent. No training or evaluation is repeated for this edit.
+
+Current delivery: 12 pages, three vector figures, nine tables, nine numbered
+equations, and twelve references. Final PDF inspection is recorded in
+`EDITORIAL_REVIEW.md`.
+
+## Earlier September 5 extension: completed
 
 The owner authorized O14-O17 research and a revision of the existing paper.
 The manuscript now includes the additional-source audit, exact book-level
