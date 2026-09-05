@@ -10,6 +10,8 @@ The original accepted model has 26,877,696 parameters. It contains eight Transfo
 
 The September 4 quality follow-up selected **RoPE with 26,779,392 parameters**. On matched validation data, loss improved from 4.34578 to 4.11584 and perplexity fell 20.54%. LayerNorm and the GELU FFN remain unchanged. The [follow-up report](docs/experiments/13-quality-followup.md) separates the staged pilot, full quality result and deployment evidence; the original measurements below remain historical results, not scores for the new weights.
 
+The September 5 [data, context, and inference follow-up](docs/experiments/14-17-data-context-inference.md) retained that checkpoint. Three additional Orozbakov volumes supplied 343,402 research-training tokens, with separate Orozbakov/Mamay holdouts. Their trained candidate failed the familiar-domain floor; context 512 stopped at 1,500 updates; BF16 inference made short generation 18.73% slower. The current model still uses context 256 and FP32 cached inference. The [updated paper](docs/paper) covers every outcome and the new evaluation's formatting limits.
+
 Tiny Manas is a research model, not a general Kyrgyz assistant. It has seen one edition of one epic. It can reproduce names, rhythm, speech patterns, and short chains of action from that source distribution. It cannot answer general questions, follow instructions, or maintain a reliable long narrative.
 
 ## Research question
@@ -62,6 +64,21 @@ The fresh FP32/BF16 runs both processed 12,288,000 training targets, with the sa
 The [experiment checklist](docs/experiments/README.md) and [accepted-state record](docs/experiments/accepted-state.json) record the outcomes. The earlier BF16 checkpoint's post-selection test measured loss **4.75756**, perplexity **116.46**, top-1 **27.74%**, top-5 **45.27%**; these numbers must not be attributed to RoPE. The subsequent RoPE selection used validation, not test. Across its 20 inspected continuations, mean repeated trigrams were 4.13%, worst 19.02%, and the longest normalized training match was eleven words. Improved prediction has not eliminated name loops, malformed words or broken event continuity.
 
 After RoPE was selected, one 100-batch test evaluation measured loss **4.53126**, perplexity **92.88**, top-1 **31.70%**, and top-5 **48.53%**. The original run's table above remains historical. RoPE is now deployed; [the follow-up release record](docs/experiments/13-quality-followup.md#production-release-completed) contains the exact image, artifact hash, public-generation acceptance and rollback target. The [earlier release](docs/experiments/12-release.md) remains documented separately.
+
+### September 5: data, evaluation, context, and inference
+
+| Experiment | Observed result | Decision |
+|---|---|---|
+| O14: additional sources and evaluation | 761,964 research-training tokens; Orozbakov book 4 validation and Mamay test held out by book; exact tokenizer round trips and long-span screening | Retain the frozen research bundle and evaluation; disclose residual OCR and formatting differences |
+| O15: same architecture, expanded corpus | Both arms completed 3,000 updates. New-book loss fell to 4.207867, but familiar loss rose to 4.133920 versus incumbent 4.088184, beyond +.02 | Do not promote expanded weights |
+| O16: RoPE context 512 | Recent primary deltas at the 1,500-update ceiling were +.112277, -.509526, +.411511; mean +.004754 | Stop at half budget; keep 256; full-budget quality unknown |
+| O17: BF16 inference | Numerical/cache checks passed; short generation +18.73% latency, near-overflow -3.14%; no required live-memory benefit | Keep FP32 inference |
+
+The large new-book improvement is not a pure diversity result. New verse retains line breaks while the original source is flattened. A post-hoc partition reproduced both full-budget scores: about 47% of the reduction occurred directly on newline-bearing targets. Other targets improved too, but their contexts also contain newlines. The [report](docs/experiments/14-17-data-context-inference.md) keeps this confound, the early control-score minimum, and the incumbent quality floor explicit.
+
+After selection closed, the unchanged checkpoint scored 11.842740 loss / 2.769318 bits per byte on the full Orozbakov-4 validation remainder, 12.370524 / 3.531991 on the held-out Mamay remainder, and 4.534839 / .947984 on the original test remainder. These use fixed targets scored once after a 512-token context-only prefix. The old 100-random-batch scores remain separate. High new-source losses expose weak transfer; the rejected expanded model was not evaluated on Mamay.
+
+No new generation audit was spent on a candidate that failed its prediction or stage gate. The incumbent's already accepted audit remains valid because its weights and generation path did not change. Across O15/O16, new training consumed 30.72M targets in 7,500 updates; training-loop subtotals total 2,999.58 seconds, excluding data preparation, evaluation, and saving.
 
 ## The complete pipeline
 
@@ -800,16 +817,16 @@ The fixed-batch evaluator bug remains documented. Deleting failed attempts would
 
 ## 15. Limits
 
-- The model learned from one edition by one performer.
+- The deployed model learned from one edition by one performer; O15's additional-source model did not pass promotion.
 - The tokenizer was trained earlier on a broader Kyrgyz corpus, so model training is not isolated from tokenizer pretraining.
 - Full-data runs use one random seed.
-- Evaluation samples random windows rather than scoring every possible held-out window.
+- Original reports use sampled random windows. O14 adds fixed, once-scored targets and whole-book remainder reporting; these protocols must not be mixed.
 - The context window stops at 256 tokens.
-- Learned absolute positions do not extrapolate beyond the configured context.
+- The selected RoPE model is trained for 256 tokens. O16 did not establish a quality case for extending that limit.
 - KV caching accelerates growing contexts, but exact crop semantics require rebuilding after the 256-token window fills.
 - The corpus license restricts redistribution and commercial use of the source text.
 
-The strongest next experiment would add legally usable Manas-only text from another narrator or edition and reserve entire documents for evaluation. That would test whether the model learned broader epic structure or mainly the local patterns of `Manas01`.
+O14/O15 carried out the additional-source and book-holdout experiment. It exposed a data/format tradeoff rather than supplying replacement weights. Better-controlled representation, suitable matched training budgets, and human coherence judgments remain open research questions; none is silently claimed as completed here.
 
 ## Evidence and references
 
@@ -831,3 +848,5 @@ Architecture references:
 ## Rights
 
 Project code and writing are currently all rights reserved. The Manas-UdS source uses CC BY-NC-SA 4.0 and is not redistributed in this repository. See [`docs/SOURCES.md`](docs/SOURCES.md) for the exact source and tokenizer provenance.
+
+The Orozbakov/Mamay research sources were admitted on explicit owner permission, not an inferred blanket license. Their books, extracted text, token arrays, and complete continuations are not redistributed.

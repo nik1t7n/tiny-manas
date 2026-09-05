@@ -10,6 +10,17 @@ must remain recoverable. Changes are accepted individually, not as an unmeasured
 
 ## Checklist
 
+**September 5 follow-up complete:** [O14-O17](14-17-data-context-inference.md)
+added three research-training volumes and book-level holdouts. Expanded weights
+failed the familiar-domain floor; RoPE context 512 stopped at 1,500 updates;
+BF16 inference failed its performance gate. The deployed RoPE/256/FP32 model
+is unchanged. Final whole-remainder evaluation was report-only after selection.
+
+- [x] 14 — Freeze additional Manas texts and new evaluation, with exact target/byte accounting and source/format limits.
+- [x] 15 — Complete fresh old/expanded 3,000-update arms; reject expanded weights for +.045736 familiar loss beyond +.02.
+- [x] 16 — Run the staged context-512 arm; stop at 1,500 without consistent primary gain. Full-budget quality remains unknown.
+- [x] 17 — Compare FP32/BF16 inference on the retained checkpoint; keep FP32 after short latency regresses 18.73%.
+
 **Selection completed on 2026-09-04.** O08 resumed from its saved 2,500-update
 checkpoint and finished; O09/O10 also finished. The protected test was evaluated
 only after selection. See [pause and recovery history](PAUSED.md).

@@ -1,5 +1,12 @@
 # Primary sources and document design
 
+September 5 extension: O14 source PDFs and permissions are documented in
+`../SOURCES.md` and the O14-O17 protocol. `data/followup-evidence.json` records
+the new measurements separately from the historical snapshot. A sixth vector
+figure plots observed data/context curves without smoothing or extrapolating
+the stopped arm. The original five figures are unchanged. The same NeurIPS
+preprint style, named fonts, and References-last structure are retained.
+
 Reviewed on September 4, 2026. These are independent reference documents, not
 evidence for Tiny Manas's local scores. Local scores come from the source files
 hashed in `data/evidence.json`.

@@ -77,6 +77,14 @@ def main():
     control = json.loads((args.control / "result.json").read_text())
     if control["status"] != "completed":
         raise RuntimeError("Unfinished control")
+    for result, directory in [(candidate, args.candidate), (control, args.control)]:
+        if sha(directory / "best-model.pt") != result["best_checkpoint_sha256"]:
+            raise RuntimeError("Selected checkpoint differs from its training result")
+        if result["protocol"]["bundle_sha256"] != provenance["bundle_sha256"]:
+            raise RuntimeError("Training and evaluation bundles differ")
+    for key in ("initial_sha256", "seed", "max_steps", "targets_per_step", "precision_train", "precision_eval", "config"):
+        if candidate["protocol"][key] != control["protocol"][key]:
+            raise RuntimeError(f"Matched comparison differs in {key}")
     report = {"provenance": provenance, "candidate_sha256": sha(args.candidate / "best-model.pt"),
               "control_sha256": sha(args.control / "best-model.pt"), "candidate_status": candidate["status"]}
     if candidate["status"] != "completed":

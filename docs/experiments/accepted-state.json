@@ -1,7 +1,13 @@
 {
-  "updated": "2026-09-04",
+  "updated": "2026-09-05",
   "frozen_baseline_tag": "tiny-manas-pre-optimization-20260904",
-  "accepted_experiments": ["01-last-position", "02-bf16", "06-rope", "09-kv-cache"],
+  "accepted_experiments": [
+    "01-last-position",
+    "02-bf16",
+    "06-rope",
+    "09-kv-cache",
+    "14-frozen-book-evaluation"
+  ],
   "position_encoding": "rope",
   "normalization": "layernorm",
   "parameters": 26779392,
@@ -9,7 +15,9 @@
   "training_precision": "bf16",
   "execution": "eager",
   "activation_checkpointing": false,
-  "accepted_optional_experiments": ["04-checkpointing"],
+  "accepted_optional_experiments": [
+    "04-checkpointing"
+  ],
   "inference_precision": "fp32",
   "training_config": "configs/manas01-27m-rope.toml",
   "checkpoint": "runs/quality-followup-rope-20260904/native-checkpoint.pt",
@@ -20,7 +28,16 @@
   "validation_loss": 4.115835547447205,
   "validation_protocol": "100 original random validation batches, seed 1837, FP32 evaluation",
   "test_evaluated_during_selection": false,
-  "final_test": {"loss": 4.531258010864258, "perplexity": 92.87532578994227, "top1_accuracy": 0.316982421875, "top5_accuracy": 0.4852685546875, "batches": 100, "seed": 1837, "precision": "fp32", "selection_complete_before_test": true},
+  "final_test": {
+    "loss": 4.531258010864258,
+    "perplexity": 92.87532578994227,
+    "top1_accuracy": 0.316982421875,
+    "top5_accuracy": 0.4852685546875,
+    "batches": 100,
+    "seed": 1837,
+    "precision": "fp32",
+    "selection_complete_before_test": true
+  },
   "inference_artifact": "artifacts/tiny-manas-27m-rope-20260904.pt",
   "inference_artifact_sha256": "abc13354d5cb1cc94c966985d95252befdfaf9f25b19c1884701442f4e519d8f",
   "inference_artifact_bytes": 107157586,
@@ -31,19 +48,104 @@
   "public_generation_verified": true,
   "browser_acceptance": "not_rerun_for_model_only_release; public_proxy_generation_verified",
   "original_checkpoint_preserved": true,
-  "rejected_experiments": ["03-compile", "05-tokenizer", "07-rmsnorm", "08-swiglu", "10-gqa"],
-  "quality_followup": {"protocol": "docs/experiments/13-quality-followup.md", "rope_updates": 3000, "rmsnorm_updates": 900, "rmsnorm_decision": "budget_stop_no_material_gain; full_budget_quality_unknown", "rmsnorm_recent_mean_validation_delta": 0.0033116870456272687, "historical_control_calibrated_and_reused": true},
+  "rejected_experiments": [
+    "03-compile",
+    "05-tokenizer",
+    "07-rmsnorm",
+    "08-swiglu",
+    "10-gqa",
+    "15-expanded-data",
+    "16-context512",
+    "17-bf16-inference"
+  ],
+  "quality_followup": {
+    "protocol": "docs/experiments/13-quality-followup.md",
+    "rope_updates": 3000,
+    "rmsnorm_updates": 900,
+    "rmsnorm_decision": "budget_stop_no_material_gain; full_budget_quality_unknown",
+    "rmsnorm_recent_mean_validation_delta": 0.0033116870456272687,
+    "historical_control_calibrated_and_reused": true
+  },
   "rollback_release_commit": "67afe940d1f38ba4e0712c0851c69317957ac8ac",
   "rollback_artifact_sha256": "4c6f70883564df6c46849c0849f38b06195b4dcaba3bde2572ef60eec4cf3494",
-  "assessed_not_triggered_experiments": ["11-output-loss"],
+  "assessed_not_triggered_experiments": [
+    "11-output-loss"
+  ],
   "selection_complete": true,
   "next_experiment": null,
   "active_candidate_run": null,
   "active_candidate_status": "none",
-  "execution_status": "quality_followup_complete_and_rope_deployed",
+  "execution_status": "data_context_precision_followup_complete_incumbent_retained",
   "saved_training_updates": 3000,
   "tokenizer_comparison_data": "runs/optimization-05-data-20260904T060626Z",
   "tokenizer_comparison_run": "runs/optimization-05-tokenizers-20260904",
   "tokenizer_comparison_status": "completed_keep_incumbent_32768",
-  "tokenizer_comparison_manifest_sha256": "7120ded73b026720bef09797c9ae9d81d261ff7012ab680bc12b3e6aa1231001"
+  "tokenizer_comparison_manifest_sha256": "7120ded73b026720bef09797c9ae9d81d261ff7012ab680bc12b3e6aa1231001",
+  "block_size": 256,
+  "training_dataset": "manas01-full",
+  "data_context_followup": {
+    "protocol": "docs/experiments/14-17-data-context-inference.md",
+    "bundle_sha256": "891f653567fd282aa1b8c270ed8c0b614ad731957f582ef2b5238db4eed35b28",
+    "training_tokens_original": 418562,
+    "additional_training_tokens": 343402,
+    "research_training_pool_tokens": 761964,
+    "deployed_training_corpus_changed": false,
+    "old_control_updates": 3000,
+    "expanded_updates": 3000,
+    "context512_updates": 1500,
+    "training_targets_total": 30720000,
+    "expanded_decision": "not_promoted_familiar_domain_regression",
+    "expanded_familiar_loss": 4.133920247424462,
+    "incumbent_familiar_loss": 4.088183838524031,
+    "context512_decision": "budget_stopped_at_1500; full_budget_quality_unknown",
+    "context512_recent_mean_primary_delta": 0.004753862987977087,
+    "inference_bf16_decision": "not_promoted_performance_gate",
+    "inference_bf16_generation_audit": "not_run_after_performance_failure",
+    "weights_and_generation_path_unchanged": true,
+    "final_fixed_evaluation": {
+      "checkpoint_sha256": "abc13354d5cb1cc94c966985d95252befdfaf9f25b19c1884701442f4e519d8f",
+      "provenance": {
+        "bundle_sha256": "891f653567fd282aa1b8c270ed8c0b614ad731957f582ef2b5238db4eed35b28",
+        "script_sha256": "c6f47451f01afb147439af96a73fbd55641feba8493e55b6e47deefb3e81187d"
+      },
+      "selection_closed_before_test": true,
+      "context": 256,
+      "orozbakov4_full_validation": {
+        "loss": 11.842739739403886,
+        "perplexity": 139070.9814108889,
+        "bits_per_byte": 2.769318138044937,
+        "summed_nll": 1173828.6774902344,
+        "targets": 99118,
+        "scored_bytes": 611514,
+        "top1_accuracy": 0.06525555398615791,
+        "context": 256,
+        "precision": "fp32",
+        "elapsed_seconds": 8.244963709032163
+      },
+      "mamay_full_test": {
+        "loss": 12.370523565956566,
+        "perplexity": 235749.14315895524,
+        "bits_per_byte": 3.5319912646985867,
+        "summed_nll": 5045280.9248046875,
+        "targets": 407847,
+        "scored_bytes": 2060821,
+        "top1_accuracy": 0.026831140108913392,
+        "context": 256,
+        "precision": "fp32",
+        "elapsed_seconds": 33.85385937499814
+      },
+      "original_test": {
+        "loss": 4.534839238626495,
+        "perplexity": 93.2085297686405,
+        "bits_per_byte": 0.9479839900188134,
+        "summed_nll": 103131.31396484375,
+        "targets": 22742,
+        "scored_bytes": 156951,
+        "top1_accuracy": 0.3155835018907748,
+        "context": 256,
+        "precision": "fp32",
+        "elapsed_seconds": 1.9342688748147339
+      }
+    }
+  }
 }

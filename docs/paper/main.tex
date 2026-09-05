@@ -25,14 +25,14 @@
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\tabnote}[1]{\par\smallskip{\footnotesize #1}\par}
 \title{Training Tiny Manas:\\A Small Language Model for a Kyrgyz Epic}
-\author{Nikita Nosov\\\url{https://nik1t7n.com}\\\small Technical report · September 4, 2026}
+\author{Nikita Nosov\\\url{https://nik1t7n.com}\\\small Technical report · September 5, 2026}
 \date{}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-I trained Tiny Manas from scratch on one edition of the Kyrgyz epic \emph{Manas} to study small language models on a personal computer. The corpus contains 465,069 tokens, encoded by a frozen 32,768-entry byte pair encoding (BPE) tokenizer. This report covers the initial correctness checks, an overfitting pilot, capacity and context comparisons, and eleven optimization investigations. On an Apple M5 with 16 GB of unified memory, increasing capacity from 13.2M to 26.9M parameters improved held-out prediction; doubling context to 512 tokens did not. Training with bfloat16 (BF16) reduced paired training-loop time by 20.58\% with nearly unchanged validation loss. After reopening an architecture experiment stopped on timing grounds, I found that rotary position embeddings (RoPE) reduced validation perplexity from 77.15 to 61.30. The selected 26,779,392-parameter checkpoint reached test perplexity 92.88. I retained LayerNorm, a GELU feed-forward network, and standard multi-head attention. Benchmarks on the learned-position model supported last-position projection and key/value (KV) caching; several other changes did not justify adoption. I report measurement failures, early stopping decisions, and evaluation definitions alongside the results. These single-seed findings describe this corpus, implementation, and budget. The model generates epic-style text but has limited narrative coherence and is unsuitable as a general Kyrgyz assistant.
+I trained Tiny Manas from scratch on the Kyrgyz epic \emph{Manas} to study small language models on a personal computer. The original corpus contains 465,069 tokens, encoded by a frozen 32,768-entry byte pair encoding (BPE) tokenizer. This report covers correctness checks, capacity and context comparisons, eleven optimization investigations, and a later data/evaluation/context/precision follow-up. On an Apple M5 with 16 GB of unified memory, increasing capacity improved prediction, and bfloat16 (BF16) reduced paired training-loop time by 20.58\%. Rotary position embeddings (RoPE) reduced original validation perplexity from 77.15 to 61.30. A subsequent corpus expansion supplied 343,402 additional training tokens and separate book-level holdouts. At a matched 3,000-update budget, it greatly improved the new-book score but worsened familiar-source loss by 0.045736 nats, exceeding the prespecified tolerance. A post-hoc partition exposed a substantial formatting contribution to that gain. The RoPE context-512 arm stopped at 1,500 updates without a consistent primary-score advantage; its full-budget outcome remains unknown. BF16 inference preserved prediction closely but made short generation 18.73\% slower. I therefore retained the 26,779,392-parameter RoPE model with context 256 and FP32 cached inference. The later report-only evaluation shows weak transfer to line-preserved texts from other sources. These single-seed findings describe the measured corpora, implementation, and budgets. The model has limited narrative coherence and is unsuitable as a general Kyrgyz assistant.
 \end{abstract}
 
 \section{Introduction}
@@ -72,7 +72,7 @@ The tokenizer corpus pipeline used normalized-text hashing for exact duplicates 
 The frozen tokenizer has 256 base-byte entries and 32,512 additional BPE entries, for 32,768 total. It uses no special/chat tokens and no text normalization. Rare text remains representable through byte pieces. Its complete artifact is pinned by commit and SHA-256 in the repository's provenance records; I did not silently replace it with the tokenizer repository's newer default. The full cleaned epic uses 9,593 distinct vocabulary IDs, but the model still predicts over all 32,768 entries.
 
 \subsection{The actual language-model corpus}
-For LM training I selected only document \code{Manas01} from the Manas-UdS archive \code{kyrgyz\_2022\_10\_03.zip}. Source metadata identifies \emph{Manas}, Sayakbai Karalaev, and a 2010 edition. The parser reads the surface-token column of the VRT source, reconstructs sentences, repairs punctuation spacing, and joins sentences with spaces. Thus the processed representation does not preserve the original page or verse-line layout.
+For the original LM experiments I selected only document \code{Manas01} from the Manas-UdS archive \code{kyrgyz\_2022\_10\_03.zip}. Source metadata identifies \emph{Manas}, Sayakbai Karalaev, and a 2010 edition. The parser reads the surface-token column of the VRT source, reconstructs sentences, repairs punctuation spacing, and joins sentences with spaces. Thus the processed representation does not preserve the original page or verse-line layout.
 
 I removed the introductory material at one verified, unique epic-start heading. This excluded 30,877 leading characters. The resulting text contains 1,794,194 characters, 3,249,652 UTF-8 bytes, and 465,069 tokenizer tokens. Exact encode/decode round trips were required for both the reconstructed document and the selected epic.
 
@@ -92,6 +92,33 @@ Test & 23,254 & 160,711 & Post-selection reporting \\
 Table~\ref{tab:splits} shows the full experiment's 90/5/5 chronological split, not randomly shuffled fragments across splits. Training windows stay inside the training prefix. The 10,000-token pilot instead uses the first 10,000 tokens, split into 9,000 training and 1,000 validation tokens, with no separate test set. Pilot losses and full-corpus losses therefore describe different held-out text and are not directly comparable.
 
 The source records describe Manas-UdS as CC BY-NC-SA 4.0. Other tokenizer sources have their own terms, including non-commercial components. I preserve provenance and do not redistribute these text payloads in the code repository. This report does not grant commercial rights to the corpus or resolve the legal status of trained weights. Exact locks and source-specific notices are retained rather than replaced by one blanket dataset license.
+
+\subsection{O14: an additional corpus and book-level holdouts}
+The September 5 follow-up admits three Orozbakov volumes for training and separates two other books before inspecting model scores (Table~\ref{tab:expanded-data}). I obtained the editions from the Bizdin collection~\cite{bizdin} and confirmed permission to use them for this student research. This records the research authorization; it does not assert an independently verified Creative Commons license for every scanned edition. The public repository contains the extraction code and source hashes, not the books or their complete transcriptions.
+
+\begin{table}[ht]
+\caption{O14 source groups, fixed before O15 training. The original training prefix is unchanged. Page numbers refer to the downloaded PDF, not printed page labels.}
+\label{tab:expanded-data}\centering\small
+\begin{tabular}{llrr}
+\toprule Source & Role & PDF pages & Tokens \\
+\midrule
+Karalaev, original prefix & Train & VRT source & 418,562 \\
+Orozbakov, book 2 & Train & 17--380 & 110,252 \\
+Orozbakov, book 3 & Train & 10--299 & 91,367 \\
+Orozbakov, book 5 & Train & 18--561 & 141,783 \\
+Orozbakov, book 4 & Validation & 16--332 & 99,630 \\
+Jusup Mamay & Test & 29--1040 & 408,359 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ordinary PDF extraction split some words into letters and mixed verse with scholarly notes. I instead used word coordinates to rejoin fragments, exclude smaller-type editorial apparatus, and remove counters and watermarks. Contents pages and section boundaries determined the verse ranges; spot checks compared extracted text with rendered pages. The extraction preserves verse newlines and does not generate replacement text or guess OCR spelling corrections. Residual recognition errors remain. Three other downloaded volumes were excluded because their dense apparatus, multi-column layout, or glyph errors required additional work.
+
+All admitted texts pass exact encode/decode and UTF-8 byte-accounting checks with the frozen tokenizer; no replacement characters occur. Screening case-folded exact 32-word spans against the new and historical holdouts, then earlier training sources, found no spans to remove. The screening cannot rule out near-duplicates, short formulas, or OCR-obscured copies. Orozbakov volumes belong to one related academic edition. Mamay supplies a different narrator for LM evaluation, but historical tokenizer exposure is not ruled out.
+
+The expanded training pool contains 761,964 tokens, including 343,402 new tokens. Half of each expanded-arm microbatch comes from the original source and half from the new volumes, sampled in proportion to eligible window starts. Windows cannot cross a source boundary. This treatment jointly changes textual coverage, source weighting, and line formatting; it is not an isolated estimate of narrator diversity.
+
+The primary selection score uses 256 evenly spaced, nonoverlapping spans of up to 128 target tokens across book 4. A 512-token prefix supplies context only. The familiar-domain control scores the complete original validation suffix after the same prefix exclusion. Contexts 256 and 512 use identical target positions: a full span gives each target respectively 129--256 or 385--512 preceding tokens. Summed negative log likelihood is divided by the exact number of targets for token loss, and by their decoded UTF-8 byte count and $\log 2$ for bits per byte. Whole-book and Mamay scores are report-only after selection. These definitions differ from the earlier random-window and O05 protocols.
 
 \section{Model: a small pre-normalized decoder}
 \label{sec:model}
@@ -358,6 +385,62 @@ Grouped-query attention (GQA)~\cite{gqa} shares key/value projections among quer
 
 Persistent FP32 cache storage fell from 6 to 1.5 MiB. Interleaved decode timing was 1.10\% slower, within the latency tolerance. Prediction did not recover sufficiently: GQA's final validation loss on the exact-byte windows was 4.497047 versus adapted MHA's 4.303030, a 0.194018-nat gap above the 0.05 ceiling. GQA's loss had improved from 5.074695 immediately after conversion, so adaptation helped, but not enough. I retained MHA. These results do not answer whether a longer adaptation, another grouping, or fresh GQA pretraining would succeed; none was run.
 
+\section{O15--O16: data and context under fixed training budgets}
+\label{sec:data-context}
+\subsection{O15: a large new-book gain that did not pass promotion}
+The additional corpus changed what the model saw, not its 26,779,392-parameter RoPE architecture. I trained a fresh old-data control and a fresh expanded-data arm from the same initial weights and seed, with BF16 training, FP32 evaluation, and the original 3,000-update learning-rate horizon. Each update consumed 4,096 targets. Both arms completed all 12,288,000 targets; the expanded arm passed its staged checks at 900, 1,200, and 1,500 updates. The measured training-loop subtotals were 1,151.57 and 1,111.20 seconds, excluding evaluation and checkpoint saves. Since these were sequential runs on a shared laptop, their difference is not a paired inference or hardware speed claim.
+
+\begin{table}[ht]
+\caption{O15 prediction on the frozen new evaluation targets. Book loss is the primary selection criterion; familiar loss is a separate safety check. These losses are not the earlier random-window scores.}
+\label{tab:data-results}\centering\small
+\begin{tabular}{lrrr}
+\toprule Checkpoint & Update & Book loss & Familiar loss \\
+\midrule
+Deployed RoPE & Historical 2,900 & 11.84687 & 4.08818 \\
+Old-data control, primary-selected & 100 & 9.89860 & 6.95710 \\
+Old-data control, final & 3,000 & 11.96507 & 4.09131 \\
+Expanded data, primary-selected/final & 3,000 & 4.20787 & 4.13392 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The expanded model greatly reduced new-book loss (Table~\ref{tab:data-results}), but its familiar loss exceeded the deployed model by 0.045736 nats. That violated the prespecified +0.02 limit. It also exceeded the fresh control's final familiar loss by 0.042609. I therefore did not promote the new weights. No generation audit or test evaluation was run for this already disqualified candidate. The result describes the chosen mixture and target budget; it does not show that additional Manas data cannot help.
+
+The control exposed a problem with relying on the primary score alone: its best book score occurred at update 100, when familiar prediction was still poor. More old-source training improved familiar loss while worsening the differently formatted book score. The separate deployed-model floor prevented an undertrained control from making promotion artificially easy.
+
+I added a post-hoc diagnostic after observing this divergence, without changing the data, checkpoints, or selection rule. It reproduced the final score on the same 32,686 book targets and partitioned them into 4,976 newline-bearing targets and 27,710 other targets. Mean loss on the first group fell from 25.1006 to 0.9245; on the second it fell from 9.6063 to 4.7975. Their weighted contributions to the aggregate changed from 3.8212 to 0.1407 and from 8.1438 to 4.0671, respectively. Direct newline-target loss accounts for about 47\% of the reduction. Other targets also improve, but their input contexts contain line breaks too. This partition cannot attribute the remaining gain solely to new content or narrator diversity.
+
+\subsection{O16: the longer-context pilot stopped at 1,500 updates}
+Since O15 did not replace the selected dataset, O16 used the original training text and the completed fresh 256-context control. The candidate changed only context and microbatch geometry: $4\times512\times2$ instead of $8\times256\times2$, retaining 4,096 targets per update, shared initial weights, and the full learning-rate horizon. The book-primary criterion remained fixed despite its observed formatting sensitivity. Figure~\ref{fig:data-context} shows both data and context trajectories.
+
+The recent three-check mean primary deltas were -0.042100 at update 900 and -0.090285 at 1,200, permitting continuation. At 1,500 the last three deltas were +0.112277, -0.509526, and +0.411511; their mean was +0.004754. They failed the -0.02 effect floor and consistency requirement. I stopped the arm after 6,144,000 targets and 736.80 seconds of measured training-loop time, leaving half its maximum update budget unspent.
+
+At that stopping point, book loss was 12.004335 using context 512 and 11.954920 using common context 256. The 256-trained control scored 11.592824. Familiar loss, measured at context 256 for both, was 4.236962 versus 4.224035. These are pilot results, not a completed trained-model comparison. No generation audit, native promotion, or test evaluation was run for the stopped arm. The result does not establish that a full-budget RoPE context-512 run would be worse.
+
+\begin{figure}[ht]
+\centering\includegraphics[width=\linewidth]{data-context-followup.pdf}
+\caption{Observed O15/O16 curves, without smoothing or extrapolation. The primary score uses a line-preserved Orozbakov book; familiar validation uses the original flattened source. The expanded-data model improves the first score but fails the familiar-domain promotion floor. The original-data context-512 arm stops at 1,500; the two context-256 arms complete 3,000 updates. Repeated checks are not independent seeds.}
+\label{fig:data-context}
+\end{figure}
+
+\subsection{Report-only evaluation after retaining the incumbent}
+The four follow-up experiments did not justify new production weights or inference precision. After closing selection, I scored the unchanged export on every retained target in the full book and test remainders (Table~\ref{tab:book-test}). Each split contributes a 512-token context-only prefix; targets then appear once under the fixed 128-target stride. The high external-book losses expose weak transfer to these line-preserved, partly OCR-derived sources. They are not test results for the rejected expanded-data model, which was never scored on the protected Mamay test.
+
+\begin{table}[ht]
+\caption{The retained RoPE/256/FP32 checkpoint after selection. These whole-remainder scores have exact target and byte denominators. Cross-corpus score differences include text and formatting differences.}
+\label{tab:book-test}\centering\small
+\begin{tabular}{lrrrr}
+\toprule Source & Targets & Scored bytes & Loss & Bits/byte \\
+\midrule
+Orozbakov 4, validation & 99,118 & 611,514 & 11.842740 & 2.769318 \\
+Mamay, held-out test & 407,847 & 2,060,821 & 12.370524 & 3.531991 \\
+Original test suffix & 22,742 & 156,951 & 4.534839 & 0.947984 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Original-test perplexity is 93.21 under this protocol, compared with 92.88 under the older 100-random-batch protocol. The weights did not change; the evaluations use different target/context definitions. Across O15/O16, the three new training arms consumed 30,720,000 targets and 2,999.58 seconds in their training-loop subtotals. Source preparation, evaluation, and checkpoint saving are outside that subtotal. The final selected checkpoint did not require another training or inference-precision run.
+
 \section{Inference, generated text, and release integrity}
 \label{sec:inference}
 \subsection{A cache with a declared context policy}
@@ -377,6 +460,13 @@ The factor two counts K and V; four is FP32 bytes per value. GQA reduces the sto
 
 This crop policy is consequential. Learned positions change after a crop; even with RoPE, deeper retained states still contain information from evicted tokens. Simply deleting the oldest cache entries would not reproduce a fresh forward pass over the cropped window. The implementation therefore rebuilds at overflow. On the learned-position checkpoint, caching accelerated a 32-token prompt plus 64 generated tokens by 1.157$\times$, but a 248-token prompt plus 64 outputs by only 1.0165$\times$. A single-token decode after 128 prior positions improved from 3.31775 to 2.57654 ms. These are synchronized local model timings, not HTTP throughput and not a new benchmark of the later RoPE checkpoint.
 
+\subsection{O17: BF16 inference on the RoPE checkpoint}
+BF16 training saved time, but inference has different shapes and memory demands. I compared FP32 and BF16 autocast on the identified 256-context RoPE export without changing its FP32 weights. Each timing condition used three warmup pairs followed by 20 interleaved pairs. Both precisions scored the same familiar-validation targets; a separate probability comparison used 10,240 targets.
+
+Validation loss changed from 4.08818384 to 4.08820787, a +0.00002403-nat difference. Mean $D_{\mathrm{KL}}(P_{\mathrm{FP32}}\Vert P_{\mathrm{BF16}})$ was 0.00007131 and top-1 agreement was 98.94\%. Cached and uncached predictions were compared within each precision at 20 real positions spanning context overflow. Maximum relative root-mean-square logit error was $3.18\times10^{-7}$ for FP32 and 0.004964 for BF16; the checked greedy choices agreed. These results passed the prespecified numerical tolerances.
+
+The performance result was less favorable. For 32 prompt tokens and 64 generated tokens, median time increased from 0.193243 to 0.229446 seconds (+18.73\%). For a near-full 248-token prompt, it decreased from 0.383007 to 0.370971 seconds (-3.14\%). The persistent full-window cache shrank from 6 to 3 MiB, but sampled live allocation after 129 cache positions barely changed: 113,640,448 versus 113,637,376 bytes. This did not meet either acceptance route: at least 5\% speed improvement in both prompt conditions, or at least 20\% less sampled live memory with at most 5\% slower generation. I did not run the optional 20-sample text audit after this performance failure. FP32 inference remains the choice for this checkpoint. These are MPS measurements, not a production-CPU BF16 result.
+
 \subsection{What generated text does and does not show}
 \label{sec:generation-audit}
 The common generation audit uses five prompts, four sampling seeds, temperature 0.8, top-$k$ 40, and 256 new tokens per continuation. Prompts include the hero's name, Bakai, a dialogue opening, and an action opening. The repository's generation-audit records retain the complete prompt/seed list. Temperature rescales logits before softmax; top-$k$ restricts the candidates. Generation then samples one token, appends it, and repeats. The model has no supervised fine-tuning, preference optimization, reinforcement learning from human feedback, retrieval, or external language model.
@@ -393,7 +483,7 @@ Serving uses FP32 with bounded generation: one request at a time, 16--128 new to
 \section{Discussion and limitations}
 \label{sec:discussion}
 \paragraph{Scope of the findings.}
-Within a fixed Manas-only recipe, more capacity improved prediction, mixed precision improved cost, and RoPE improved held-out loss. Increasing context, changing the activation, reducing vocabulary, or sharing KV heads did not automatically improve the delivered model. These outcomes support retaining changes that helped under the measured conditions.
+Within the original Manas-only recipe, more capacity improved prediction, mixed precision improved training cost, and RoPE improved held-out loss. Increasing context, changing the activation, reducing vocabulary, or sharing KV heads did not automatically improve the delivered model. The later corpus expansion improved a different book score but failed the familiar-domain floor, while BF16 inference failed its performance gate. These outcomes support retaining changes that helped under the measured conditions and stated quality constraints.
 
 \paragraph{Stopping rules should match the question.}
 Equivalence optimizations can fail on correctness or cost without a full training run. Architectural changes deserve a quality check if a modest cost increase could buy a useful gain. RoPE demonstrates the opportunity cost of the original speed-first filter. RMSNorm demonstrates the complementary limit: a flat early comparison can justify saving resources, but cannot prove that the final ordering would remain unchanged. Reopening a rule must be recorded rather than quietly rewriting the old decision.
@@ -402,18 +492,18 @@ Equivalence optimizations can fail on correctness or cost without a full trainin
 Scheduled validation and additional validation use different samples. Exact-byte BPB, timing, memory, and copying measurements also require explicit denominators and definitions. Comparing mismatched measurements can create an apparent improvement even when the model is unchanged.
 
 \paragraph{Data and statistical limitations.}
-All substantive LM training uses one edition of one epic. Its formulaic language, related passages, tokenizer exposure, and chronological distribution shift make it a narrow benchmark. Random-window training repeatedly revisits the same text. There is no cross-edition holdout, general Kyrgyz task suite, multi-seed confidence interval, hyperparameter sweep for every candidate, or external baseline study in this report. Validation was repeatedly consulted during development, and the historical test suffix had already been evaluated in earlier phases. The reported gains are evidence for this experimental sequence, not unbiased estimates of performance on an unseen population of tasks.
+The deployed model still uses one edition of one epic. The O15 research arm adds three volumes, and O14 supplies a separate book for validation and a different narrator for test. These are limited source groups, not a broad Kyrgyz benchmark. Formulaic language, related editions, residual OCR errors, formatting differences, and historical tokenizer exposure constrain interpretation. The final Mamay score belongs only to the retained model. There is no general Kyrgyz task suite, multi-seed confidence interval, hyperparameter sweep for every candidate, or external baseline study. Validation was repeatedly consulted, and the historical test suffix had already been evaluated in earlier phases. The reported gains are evidence for this experimental sequence, not unbiased estimates on an unseen population of tasks.
 
 \paragraph{Hardware and reproducibility limitations.}
 MPS timings were measured on a shared 16 GB M5 host. Sequential full runs can experience different background load and temperature. Interleaved short comparisons reduce, but do not eliminate, this concern. Compiler and RNG observations are tied to the inspected runtime. Saved data, hashes, configurations, and curves enable auditing; exact future floating-point trajectories across platforms are not promised. Raw licensed corpora and weight files are not committed to Git, so public source access alone is not a claim that all artifacts are publicly downloadable.
 
 \paragraph{Use limitations and next experiments.}
-Tiny Manas is unsuitable as a general assistant, a factual reference for the epic, or a reliable Kyrgyz writing tool. Cultural and linguistic material should not be reduced to a claim of ``understanding'' because a small prediction score improves. The next useful work would begin with cleaner, more diverse authorized text, cross-edition evaluation, repeated seeds, and explicit human review of coherence. Longer-context, alternative architecture, quantization, batching, and post-training work remain future questions, not completed results.
+Tiny Manas is unsuitable as a general assistant, a factual reference for the epic, or a reliable Kyrgyz writing tool. A small prediction-score improvement does not establish cultural or linguistic ``understanding.'' O14/O15 show why text preparation and evaluation design need attention before attributing a gain to diversity. The remaining questions include representation-consistent data comparisons, adequate matched training budgets, repeated seeds, and human review of coherence. This follow-up did not introduce quantization, request batching, a new attention backend, a runtime upgrade, or supervised fine-tuning.
 
 \section{Conclusion}
-I progressed from a fixed-batch learning check to a versioned 26.78M-parameter RoPE decoder that generates Manas-like text. The final model uses a frozen 32k tokenizer, BF16 training, and FP32 cached inference within a 256-token window. It reaches validation perplexity 61.30 and post-selection test perplexity 92.88 under the recorded protocol. Retained configurations and checkpoints link these results to their runs and selection rules. The gains remain specific to this experiment, with weak long-range coherence and substantial evaluation limitations. Broader data and human evaluation are needed before making stronger claims about language quality.
+I progressed from a fixed-batch learning check to a versioned 26.78M-parameter RoPE decoder that generates Manas-like text. The September 5 follow-up retained its frozen 32k tokenizer, BF16 training, and FP32 cached inference within 256 tokens. Additional books improved the new-book score but violated the familiar-domain floor; the longer-context pilot stopped without consistent primary improvement; BF16 inference was numerically close but too costly for short generation. The new holdouts also exposed weak source transfer in the retained model. Saved configurations, curves, negative outcomes, and artifact hashes link these conclusions to the actual runs. They remain findings about these corpora and budgets, with limited narrative coherence and no general Kyrgyz-assistant claim.
 
-\begin{thebibliography}{13}
+\begin{thebibliography}{14}
 \small
 \raggedright
 \bibitem{attention} Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. \emph{Attention Is All You Need}. NeurIPS, 2017. \href{https://arxiv.org/abs/1706.03762}{arXiv:1706.03762}.
@@ -429,6 +519,7 @@ I progressed from a fixed-batch learning check to a versioned 26.78M-parameter R
 \bibitem{cce} Erik Wijmans, Brody Huval, Alexander Hertzberg, Vladlen Koltun, and Philipp Krähenbühl. \emph{Cut Your Losses in Large-Vocabulary Language Models}. ICLR, 2025. \href{https://arxiv.org/abs/2411.09009}{arXiv:2411.09009}.
 \bibitem{hyperband} Lisha Li, Kevin Jamieson, Giulia DeSalvo, Afshin Rostamizadeh, and Ameet Talwalkar. \emph{Hyperband: A Novel Bandit-Based Approach to Hyperparameter Optimization}. Journal of Machine Learning Research, 18(185):1--52, 2018. \href{https://jmlr.org/papers/v18/16-558.html}{JMLR article}.
 \bibitem{nanogpt} Andrej Karpathy. \emph{nanoGPT}. Software repository, accessed September 4, 2026. \href{https://github.com/karpathy/nanoGPT}{github.com/karpathy/nanoGPT}. Consulted as an implementation reference; Tiny Manas is a separate implementation.
+\bibitem{bizdin} Bizdin. \emph{Manas collection: editions attributed to Sagymbay Orozbakov and Jusup Mamay}. Digital source catalogue, accessed September 5, 2026. \href{https://new.bizdin.kg/knigi/category/manas}{new.bizdin.kg/knigi/category/manas}. Exact PDFs, verse-page ranges, and SHA-256 locks are identified in the O14 experiment record.
 \end{thebibliography}
 
 \end{document}

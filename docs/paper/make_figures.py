@@ -202,7 +202,41 @@ def cache():
     c.save()
 
 
-architecture()
-curves()
-cache()
-print("Wrote five vector figures with embedded fonts; curves use observed CSV data.")
+def followup():
+    import json
+    import math
+    evidence = json.loads((HERE / "data/followup-evidence.json").read_text())
+    runs = {name: rows(f"followup-{name}.csv") for name in ("old256", "expanded256", "context512")}
+    c = new("data-context-followup.pdf", 396, 350)
+    styles = [("old256", GREY, (1, 2)), ("expanded256", TEAL, False), ("context512", RUST, (6, 2))]
+    for key, y, title in [("primary", 220, "(a) New book: Orozbakov 4"),
+                           ("familiar", 61, "(b) Familiar source: Karalaev suffix")]:
+        values = [r[key] for d in runs.values() for r in d]
+        lo, hi = math.floor(min(values)), math.ceil(max(values))
+        ticks = list(range(lo, hi+1, 2 if hi-lo > 6 else 1))
+        pt = axes(c, 39, y, 344, 98, 100, 3000, lo, hi, [100, 1000, 2000, 3000], ticks,
+                  "Optimizer updates", "Loss (nats/token)")
+        text(c, 39, y+119, title, 8.5, True)
+        for name, col, dash in styles:
+            series(c, runs[name], "step", key, pt, col, dash)
+    context_mixture = evidence["runs"]["context512"]["protocol"]["mixture"]
+    for x, label, col, dash in [(15, "Old / 256", GREY, (1, 2)), (133, "Expanded / 256", TEAL, False),
+                               (278, f"{context_mixture.title()} / 512", RUST, (6, 2))]:
+        line(c, [(x, 14), (x+15, 14)], col, 1.5, dash)
+        text(c, x+20, 11, label, 7.3)
+    c.save()
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--followup", action="store_true", help="Build only the O14-O17 figure from completed observed CSVs")
+    args = parser.parse_args()
+    if args.followup:
+        followup()
+        print("Wrote the data/context figure from observed follow-up curves.")
+    else:
+        architecture()
+        curves()
+        cache()
+        print("Wrote five vector figures with embedded fonts; curves use observed CSV data.")

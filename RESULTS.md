@@ -1,6 +1,29 @@
 # Tiny Manas experiment report
 
-## Abstract
+## Current selection: September 5, 2026
+
+The retained model is the September 4 RoPE checkpoint: 26,779,392 parameters,
+context 256, BF16 training and FP32 cached inference. Its earlier matched
+validation loss is 4.115836; see the [RoPE report](docs/experiments/13-quality-followup.md).
+The original capacity experiments below are historical, not scores for those
+newer weights.
+
+The [O14-O17 follow-up](docs/experiments/14-17-data-context-inference.md) is complete:
+
+| Change | Result | Selection |
+|---|---|---|
+| Data/evaluation | Three Orozbakov training volumes, separate book-4 validation and Mamay test; 343,402 additional training tokens | Research bundle retained, with OCR/format limits |
+| Expanded-corpus training | 3,000 updates; new-book loss 4.207867; familiar loss 4.133920 versus incumbent 4.088184 | Not promoted: +.045736 exceeds +.02 familiar limit |
+| Context 512 | Stopped at 1,500; last-three mean primary delta +.004754 | Keep 256; full-budget outcome unknown |
+| BF16 inference | Numerical parity tolerances passed; short generation 18.73% slower | Keep FP32 |
+
+Post-selection scoring of the unchanged checkpoint, with each retained target
+scored once: original test loss 4.534839, PPL 93.21; Orozbakov-4 full validation
+loss 11.842740; Mamay test loss 12.370524. These target definitions differ from
+the older random-window scores. The high book losses indicate weak source and
+format transfer. The rejected expanded model was not evaluated on Mamay.
+
+## Original experiment abstract
 
 Tiny Manas is a decoder-only Transformer trained from scratch on one Kyrgyz edition of the epic *Manas*. The aim was not to build a general assistant. The aim was to understand the complete language-model pipeline and determine how far a compact model could go on one consumer Apple Silicon machine.
 
@@ -8,7 +31,7 @@ The experiment used 465,069 tokens from `Manas01`, performed by Sayakbai Karalae
 
 After correctness and pilot gates, three full-data candidates were tested. Doubling context from 256 to 512 made prediction worse and training slower. Increasing model capacity from 13.19M to 26.88M parameters reduced independent validation perplexity from 103.38 to 77.15 and test perplexity from 151.42 to 116.45. The larger model remained practical: its full run took 24.4 minutes and peaked below 1 GiB of memory allocated through PyTorch MPS.
 
-The final model produces recognizable Manas-like language: hero names, combat actions, reported speech, parallel phrases, and verse-like rhythm. It does not maintain a reliable long narrative. It can repeat names or formulas, create malformed words, and confuse who is acting. Across 20 fixed generations, its longest exact match with training text was seven words, so the measured gain was not dominated by copying long passages.
+The original final model produces recognizable Manas-like language: hero names, combat actions, reported speech, parallel phrases, and verse-like rhythm. It does not maintain a reliable long narrative. It can repeat names or formulas, create malformed words, and confuse who is acting. Across 20 fixed generations, the corrected maximum normalized matching word span is nine words. The earlier seven-word result came from asymmetric normalization and is superseded by the [audit correction](docs/experiments/00-audit-correction.md); this small sample cannot establish an absence of memorization elsewhere.
 
 ## 1. Research question
 
@@ -88,7 +111,7 @@ This is not the same as understanding the plot. Typical failures remain:
 
 The mean repeated-trigram ratio was `4.77%` for the 13M base and `4.21%` for the 27M model. That small aggregate improvement should not be oversold: one final-model sample still had a `25.7%` repeated-trigram ratio. Reading the whole distribution matters.
 
-The longest exact training-text match was six words for the base and seven for the final model. Those short matches are natural in a highly formulaic oral epic. No generation was dominated by a copied long training passage.
+The original matcher reported six words for the base and seven for the 27M model. Rechecking the same 27M outputs with symmetric word normalization raised that maximum to nine. This is a case-folded word-sequence match that ignores punctuation and whitespace, not exact byte copying. The historical raw files remain unchanged.
 
 ## 6. Hardware result
 

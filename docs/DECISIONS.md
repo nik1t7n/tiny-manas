@@ -1,5 +1,8 @@
 # Decisions
 
+This is a chronological record. Later entries supersede earlier selections;
+the current artifact is identified in [accepted-state](experiments/accepted-state.json).
+
 ## D001 — Keep Tiny Manas standalone
 
 - **Decision:** evaluate Tiny Manas through its own correctness, validation, generation, memorization, and scaling evidence. Do not compare it with the earlier bigram project.
@@ -95,3 +98,52 @@
 - **Rejected alternative:** prefer the cheaper 13M model despite the measured quality gap, or continue unbounded tuning on the same test suffix.
 - **Trade-off:** generation is slower and the checkpoint is larger, while global narrative coherence remains limited by one source edition.
 - **Reconsider when:** new Manas-only data is legally and technically audited, or an architecture change is preregistered against a fresh held-out set.
+
+## D013 — Retain the measured RoPE release and useful execution changes
+
+September 4: select the 26,779,392-parameter RoPE model after matched validation
+improves from 4.345779 to 4.115836. Keep last-position projection, BF16 training,
+and request-local KV caching. Keep LayerNorm, GELU, 32k vocabulary, and MHA;
+checkpointing remains an optional memory tradeoff. The individual optimization
+reports distinguish rejected full runs, stopped pilots, and the untriggered
+fused-loss question. This supersedes the original architecture/weight choices,
+not their historical measurements. Native artifact and rollback evidence are
+in [experiment 13](experiments/13-quality-followup.md).
+
+## D014 — Admit a research corpus and freeze book-level evaluation
+
+September 5: use owner-authorized Orozbakov books 2/3/5 as additional research
+training data, book 4 as validation, and Mamay as report-only test. Preserve
+source groups, exact token/byte accounting, and source hashes. The 761,964-token
+research pool includes 343,402 new training tokens. Coordinate extraction still
+contains OCR errors; new verse preserves line breaks absent from the old source.
+No inferred blanket license, generated repair text, or raw-corpus publication.
+This is admission for a controlled experiment, not automatic model promotion.
+
+## D015 — Reject the expanded weights at the fixed budget
+
+Both old/expanded arms complete 3,000 updates from shared initial weights.
+Expanded new-book loss is 4.207867, but familiar loss 4.133920 exceeds the
+incumbent's 4.088184 by .045736, beyond the registered +.02 tolerance. Keep the
+incumbent and the research evidence. A post-hoc partition reveals a large
+format contribution; it does not replace the acceptance criterion or establish
+a pure narrator-diversity effect. No candidate test or generation audit follows
+this failed prediction gate.
+
+## D016 — Stop the context-512 pilot without promoting it
+
+The original-data RoPE context-512 run reaches the 1,500-update stage ceiling.
+Its final three primary deltas are +.112277, -.509526, and +.411511; the mean
+is +.004754. Stop under the fixed rule and preserve the resumable state. Keep
+context 256. The remaining half budget is unspent; a full-run outcome was not
+measured and must not be described as a full-budget rejection.
+
+## D017 — Keep FP32 inference despite BF16 numerical agreement
+
+BF16 autocast on the unchanged RoPE checkpoint passes numerical/cache gates,
+but short generation takes 18.73% longer and near-overflow latency falls only
+3.14%. A smaller persistent cache does not yield the required sampled live-memory
+benefit. Keep FP32 on MPS and production CPU; no CPU BF16 claim is made.
+After all four follow-ups close, evaluate the unchanged selected checkpoint on
+the new report-only book/test remainders. Detailed scores and interpretation are
+in [O14-O17](experiments/14-17-data-context-inference.md).

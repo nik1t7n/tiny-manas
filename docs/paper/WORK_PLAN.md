@@ -1,5 +1,25 @@
 # Tiny Manas retrospective paper
 
+## September 5 extension: completed
+
+The owner authorized O14-O17 research and a revision of the existing paper.
+The manuscript now includes the additional-source audit, exact book-level
+evaluation, both full data arms, the stopped context-512 arm, the BF16 inference
+screen, post-hoc formatting diagnosis, and report-only test results. The retained
+model and its inference precision did not change.
+
+Final revision: 19 pages, six vector figures, ten tables, nine numbered
+equations, and fourteen bibliography entries. All nineteen rendered pages were
+inspected. All fonts are embedded; the build has no undefined references,
+missing-character warnings, or overfull boxes. Two underfull spacing warnings
+remain in narrow cells of the historical systems table, without clipping.
+References are last; removed appendices and acknowledgments remain absent.
+The original five figure files and historical numerical snapshot are preserved.
+The new collector reads nine real follow-up artifacts and does not call a model.
+
+The sections below retain the original plan and prior delivery history. Their
+page counts and earlier scope boundaries describe those earlier revisions.
+
 ## Deliverable and scope
 
 Write an English, first-person technical report by Nikita Nosov covering the

@@ -1,5 +1,25 @@
 # Curated editorial and presentation review
 
+## September 5 update
+
+The follow-up revision retains the same style and author voice. It adds O14-O17
+and revises the abstract, data limitations, and conclusion to match the completed
+research. The data table separates the control's early primary minimum from its
+full-budget state. The diagnostic is identified as post-hoc; familiar-domain
+regression, budget stopping, and an unassessed generation gate are not hidden
+inside generic rejection labels. Original and new evaluation denominators remain
+separate, and Mamay scores are attributed only to the retained checkpoint.
+
+The actual 19-page PDF was rendered and inspected page by page. Its six vector
+figures, ten tables, nine numbered equations, and fourteen references fit without
+clipping or overlap. All fonts are embedded. There are no undefined references,
+missing glyph warnings, or overfull boxes. Two underfull-box warnings remain in
+the historical systems table; those cells are readable. The new curve contains
+only observed points and ends the stopped arm at update 1,500. References remain
+last, with no appendices or acknowledgments restored.
+
+The historical review below applies to the September 4 revision.
+
 Reviewed September 4, 2026. Scope: the English technical report ending at
 References. This is an editorial and typesetting review, not independent peer
 review or a new evaluation of model quality. The removed appendices stay removed.

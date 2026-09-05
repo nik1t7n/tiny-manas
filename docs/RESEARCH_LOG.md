@@ -5,6 +5,16 @@ Forecasts are written before each run. Failed runs and wrong predictions remain 
 ## O14–O17 — 2026-09-05: data, context, and inference
 
 The owner authorized only four follow-up experiments and conditional release.
+
+Completed: O14's research corpus/evaluation is retained, while O15/O16/O17
+do not replace production weights, context, or inference precision. O16 stopped
+at 1,500 updates: last-three mean primary delta +.004754 with inconsistent signs.
+After selection closed, the unchanged model scored full book-4 validation loss
+11.842740, held-out Mamay loss 12.370524, and fixed original-test loss 4.534839.
+These are the new fixed-target protocol, not replacements for old random-window
+scores. No model training remains active. Website edits are restricted to Part II
+in both translations; Part I, its introduction, and frontmatter are protected
+byte-for-byte at the owner's explicit request.
 The [preregistered protocol](experiments/14-17-data-context-inference.md) records
 hypotheses, resource budgets, matched comparisons, stopping rules, and promotion
 thresholds before observing new model scores. Source discovery found one Manas
@@ -28,6 +38,19 @@ Exact commands and source hashes are retained in run protocols. Initial book
 validation is much harder than the familiar suffix; the treatment includes
 verse newlines absent from the old flattened source. This format shift will
 remain part of the interpretation rather than being corrected after scores.
+
+O15 completed both 3,000-update arms. The expanded arm's new-book/familiar
+losses are 4.207867 / 4.133920; deployed RoPE on the same targets is
+11.846868 / 4.088184. The +.045736 familiar regression exceeds the +.02
+gate, so O15 is not promoted despite a large primary improvement. A bounded
+post-hoc validation partition finds improvements on both newline-bearing and
+other targets; about 47% of the aggregate gain is directly on newline targets.
+The data/format mixture remains a confound for a pure diversity claim.
+The original-data control's final familiar loss is 4.091312, but its minimum
+new-book loss occurred at update 100. Retaining the incumbent floor was therefore
+necessary. O16 starts on the retained original training data with this completed
+fresh control; the book-primary criterion is unchanged. No rejected-arm
+generation audit or protected test has been run.
 
 O17's independent screen on the still-deployed RoPE checkpoint completed first:
 BF16 validation drift was only +0.00002403 nats and cache/numerical gates passed,

@@ -1,6 +1,8 @@
 # O14–O17: corpus, evaluation, context, and inference precision
 
-Status: protocol registered before new model scores are observed.
+Status: research complete; incumbent RoPE/256/FP32 retained. Protocol was
+registered before new model scores were observed. Publication record follows
+the completed research results below.
 Date: September 5, 2026. Owner authorized execution, documentation, conditional
 promotion, repository/website updates, and revision of the existing paper.
 
@@ -185,3 +187,203 @@ image and artifact for rollback. Update README, research/decision logs,
 accepted-state, both website translations, and the 15-page paper with outcomes
 including rejected, blocked, or budget-stopped arms. Keep the paper's References
 last and do not restore the removed appendices or acknowledgments section.
+
+## Execution evidence
+
+### O14: admitted data, with explicit transcription limits
+
+O14 produced a frozen research bundle. It did not establish that OCR-derived
+verse improves a trained model. That is the separate O15 question.
+
+| Source | Role | Tokens | UTF-8 bytes/token |
+|---|---|---:|---:|
+| Karalaev, original training prefix | Training | 418,562 | 6.9869 |
+| Orozbakov, book 2 | Training | 110,252 | 6.2396 |
+| Orozbakov, book 3 | Training | 91,367 | 6.1993 |
+| Orozbakov, book 5 | Training | 141,783 | 6.2882 |
+| Orozbakov, book 4 | Validation | 99,630 | 6.1684 |
+| Jusup Mamay | Final test | 408,359 | 5.0530 |
+
+The official source catalogue is [Bizdin's Manas collection](https://new.bizdin.kg/knigi/category/manas).
+Each cached source record retains its exact book page, download URL, PDF digest,
+page count, and authorization basis. The admitted token-array file has SHA-256
+`f0ce8f961e508e43e6409c4a9c9fe6131fee6762dc3d63b9cdebb325ff1e56ed`.
+Raw PDFs, text, arrays, and complete generated continuations are not redistributed.
+
+Reproduction from the repository, with authorized source access:
+
+```sh
+.venv/bin/python scripts/prepare_manas_expansion.py
+.venv/bin/python scripts/extract_manas_verse.py
+.venv/bin/python scripts/build_manas_expansion.py
+.venv/bin/python scripts/experiment_data_context.py --mixture old --context 256 --output runs/data-control-20260905
+.venv/bin/python scripts/experiment_data_context.py --mixture expanded --context 256 --control runs/data-control-20260905 --output runs/data-expanded-20260905
+```
+
+Source revision `9327c3f` contains the frozen data and training runners. The
+control began before that commit; embedded source digests, not the parent Git
+label, identify its actual code. The builder refuses to overwrite an existing
+manifest. Training resumes a matching checkpoint and refuses mismatched
+provenance; it does not silently restart from scratch.
+
+### Diagnostic added after observing the O15 control curve
+
+The completed old-data run improves familiar validation while its verse-book
+loss rises. After observing this discrepancy and the early expanded-arm scores,
+add one post-hoc attribution pass on the same fixed book-validation targets.
+Compare final 3,000-update states, separating newline-bearing target tokens from
+all other tokens. Reproduce the already recorded aggregate score and report each
+group's contribution. This is a diagnosis of the observed measurement behavior,
+not a new training arm, a data rewrite, a test-set comparison, or a changed
+promotion rule. It cannot isolate all formatting effects or establish a pure
+benefit from narrator diversity. Run only after both full-budget states exist.
+
+### O15: both complete; expanded weights not promoted
+
+Both arms completed 3,000 updates and 12,288,000 sampled targets. The expanded
+arm passed its 900/1,200/1,500 continuation gates; no learning-rate horizon or
+data weighting was changed in response to its scores. Training-loop subtotals
+were 1,151.57 s for the control and 1,111.20 s for the expanded arm, excluding
+evaluation and checkpoint saves. Sequential shared-host timing is not a paired
+speed benchmark of these datasets.
+
+| Checkpoint | Selection update | New-book loss | Familiar loss |
+|---|---:|---:|---:|
+| Previously deployed RoPE | Historical 2,900 | 11.846868 | 4.088184 |
+| Fresh old-data control, primary-selected | 100 | 9.898599 | 6.957103 |
+| Fresh old-data control, final budget | 3,000 | 11.965065 | 4.091312 |
+| Expanded-data arm, primary-selected and final | 3,000 | 4.207867 | 4.133920 |
+
+All rows here use the same new fixed target definitions. The early primary
+minimum of the control is informative: minimizing a shifted book score alone
+would select an undertrained model with poor familiar-domain performance.
+The separate incumbent floor prevents this from lowering the acceptance bar.
+
+The expanded model improves the registered primary score by 5.690733 nats
+against the primary-selected control. Its familiar loss, however, exceeds the
+deployed model by .0457364 nats, beyond the +.02 limit. Even against the fresh
+control's final state, the difference is +.0426087. **Do not promote O15.**
+The run proves a tradeoff at this fixed mixture and target budget, not that
+additional Manas data cannot improve the model. No 20-generation audit or test
+evaluation was spent on this already disqualified arm.
+
+The post-hoc format diagnostic reproduced both final primary scores. Of 32,686
+fixed targets, 4,976 contain newlines and 27,710 do not:
+
+| Target group | Old-data mean loss | Expanded-data mean loss | Old / expanded contribution to total loss |
+|---|---:|---:|---:|
+| Newline-bearing | 25.10060 | .92450 | 3.82123 / .14074 |
+| Other tokens | 9.60626 | 4.79748 | 8.14384 / 4.06712 |
+
+Direct loss on newline-bearing targets accounts for about 47% of the total
+reduction. Prediction also improves on other targets, but their preceding
+contexts contain line breaks too. This partition cannot assign the remaining
+gain exclusively to additional content or narrator diversity. The new corpus
+and evaluation remain useful research artifacts even though their trained
+candidate does not replace the deployed weights.
+
+Evidence: `runs/data-control-20260905/result.json`,
+`runs/data-expanded-20260905/result.json`,
+`runs/data-selection-20260905/selection.json`, and
+`runs/data-evaluation-20260905/format-diagnostic.json`. The matched full-budget
+checkpoints and optimizer states remain local. O16 therefore uses the original
+training corpus and the completed fresh 256-context control. It retains the
+registered book-primary/familiar-control evaluation rather than changing a
+criterion after O15 exposes a format shift.
+
+### O17: screen on the incumbent RoPE export
+
+This independent screen used the deployed 256-context export identified above.
+If data/context selection replaces it, its successor needs a separate O17 run.
+The comparison leaves FP32 parameters unchanged and enables BF16 autocast only.
+
+| Measurement | FP32 | BF16 |
+|---|---:|---:|
+| Fixed familiar validation loss | 4.08818384 | 4.08820787 |
+| 32-token prompt, 64 new tokens, median seconds | .193243 | .229446 |
+| 248-token prompt, 64 new tokens, median seconds | .383007 | .370971 |
+| 128-token prefill median milliseconds | 3.861 | 4.260 |
+| One cached decode median milliseconds | 3.143 | 3.561 |
+| Full 256-position persistent cache | 6 MiB | 3 MiB |
+| Sampled live allocation after 129 cache positions | 113,640,448 B | 113,637,376 B |
+
+Each generation row uses 20 interleaved pairs after three warmup pairs. Loss
+drift is +.00002403 nats. Mean KL(P_FP32 || P_BF16) is .00007131 across 10,240
+real targets; top-1 agreement is 98.94%. Cached/uncached comparisons cover 20
+real positions including overflow. Maximum relative RMS error is 3.184e-7 in
+FP32 and .004964 in BF16; all compared greedy choices agree. These numerical
+checks pass their registered tolerances.
+
+Performance fails: short generation takes 18.73% longer, while near-overflow
+latency falls only 3.14%. Halving the persistent cache does not produce the
+required 20% reduction in sampled live allocation. Allocation samples do not
+measure whole-process or peak memory. No generation-quality audit was run after
+this performance failure; `generation_metrics: false` means unassessed here,
+not observed text degradation. Keep FP32 inference on this checkpoint. The MPS
+screen does not measure or authorize production-CPU BF16.
+
+Evidence: `runs/inference-bf16-20260905/{protocol,numerics,timing,result}.json`.
+The helper later gained an optional audit-corpus argument without changing this
+screen's scoring/timing behavior; the result retains its original helper digest.
+The prediction of small numerical drift held. The prediction of a useful
+inference speed/memory benefit did not hold on these prompts and this host.
+
+### O16: stop at the 1,500-update ceiling
+
+The unchanged original training corpus supplies both contexts. T=256 uses
+8x256x2 and T=512 uses 4x512x2, preserving 4,096 targets per update and every
+learned initial tensor. Both score the same new-book targets; the 512 arm also
+scores them at context 256. Familiar-source evaluation always uses context 256.
+No data or primary-score change was made after seeing O15's format sensitivity.
+
+| Stage | Recent mean primary delta, 512 minus 256 | Decision |
+|---|---:|---|
+| 900 | -.042100 | Continue |
+| 1,200 | -.090285 | Continue |
+| 1,500 | +.004754 | Stop |
+
+The final three deltas are +.112277, -.509526, and +.411511 nats. Their mean
+does not reach the -.02 floor and their signs are inconsistent. Stop under the
+registered rule. The runner consumed 6,144,000 targets in 1,500 updates, saving
+the remaining half of the full budget. Training-loop subtotal: 736.80 seconds.
+
+At update 1,500, book loss is 12.004335 with the model's full 512 context and
+11.954920 with common context 256. The 256-trained control has book loss
+11.592824 at that update. Familiar losses are 4.236962 versus 4.224035. These
+are pilot measurements, not a completed model-selection comparison. The best
+scheduled book checkpoint again occurs at update 100, with loss 9.878895.
+No native promotion, generation audit, or protected test is run for this arm.
+The result does not establish full-budget inferiority of RoPE context 512.
+
+Evidence: `runs/context512-20260905/{result,history,stage-900,stage-1200,stage-1500}.json`
+and `runs/context-selection-20260905/selection.json`. Keep context 256.
+
+### Selection closed; final report-only evaluation
+
+O15 failed the familiar-domain floor; O16 stopped without earning a full run;
+O17 failed its inference performance gate. The selected artifact therefore
+remains SHA-256 `abc13354d5cb1cc94c966985d95252befdfaf9f25b19c1884701442f4e519d8f`.
+No new model or precision mode is deployed. The existing accepted 20-generation
+audit is reused; the model and its generation path are unchanged.
+
+Only after that decision, evaluate the retained checkpoint on the complete
+remaining target spans of each report-only split (after a 512-token context
+prefix, 128-target stride, no repeated targets):
+
+| Text | Targets | Scored bytes | Loss | Perplexity | Bits/byte | Top-1 |
+|---|---:|---:|---:|---:|---:|---:|
+| Orozbakov 4, full validation remainder | 99,118 | 611,514 | 11.842740 | 139,070.98 | 2.769318 | 6.53% |
+| Mamay, held-out test remainder | 407,847 | 2,060,821 | 12.370524 | 235,749.14 | 3.531991 | 2.68% |
+| Original test remainder | 22,742 | 156,951 | 4.534839 | 93.21 | .947984 | 31.56% |
+
+The high external-book losses expose weak transfer to these OCR-derived,
+line-preserved sources. They are not scores for the rejected expanded model:
+that model was never evaluated on the protected Mamay test. Nor does the
+original-test score supersede the older 100-random-batch result of 4.531258:
+the weights are the same and the target/context definitions differ.
+
+Evidence: `runs/data-context-final-20260905/final-evaluation.json`.
+Total new training in O15/O16: 7,500 updates, 30,720,000 targets, and 2,999.58
+seconds in the training-loop subtotals. Data preparation, evaluation, and saving
+are outside that subtotal. No paid compute, new SFT, quantization, request
+batching, attention backend, or runtime upgrade was introduced.
