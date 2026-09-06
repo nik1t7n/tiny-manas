@@ -2,7 +2,7 @@
 
 **A roughly 27M-parameter decoder-only Transformer trained from scratch on the Kyrgyz epic *Manas*.**
 
-[Read the general-audience article](https://nik1t7n.com/essays/training-tiny-manas) · [Inspect the tokenizer](https://github.com/nik1t7n/kyrgyz-tokenizer) · [Browse the experiment results](#experimental-results)
+[Download the model on Hugging Face](https://huggingface.co/Nik1t7n/tiny-manas) · [Read the general-audience article](https://nik1t7n.com/essays/training-tiny-manas) · [Inspect the tokenizer](https://github.com/nik1t7n/kyrgyz-tokenizer) · [Browse the experiment results](#experimental-results)
 
 Tiny Manas is a small language model that learns to continue one edition of the Kyrgyz epic *Manas*. I wrote the model and the training pipeline to study the complete language-model path without hiding the important mechanics behind a large framework: verified text acquisition, byte-level BPE tokenization, shifted training batches, causal self-attention, backpropagation, checkpoint selection, generation, and memorization analysis.
 
