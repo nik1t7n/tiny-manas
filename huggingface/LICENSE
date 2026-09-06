@@ -1,0 +1,22 @@
+Tiny Manas research release
+
+Copyright (c) 2026 Nikita Nosov. All rights reserved.
+
+The original Tiny Manas model code, documentation, model weights, technical
+paper, and tokenizer artifact are published for research transparency and
+public inspection. Unless the copyright holder grants separate written
+permission, no license is granted to copy, modify, redistribute, sublicense,
+or sell those original materials.
+
+The Manas-UdS corpus text used to train the accepted model is not included in
+this repository. That source corpus is licensed under Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International:
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+The tokenizer was originally released at:
+https://github.com/nik1t7n/kyrgyz-tokenizer
+
+Third-party dependencies and referenced works remain subject to their own
+licenses and terms. Publishing the model does not relicense the source corpus,
+dependencies, or referenced materials, and it does not remove any upstream
+attribution, non-commercial, or share-alike requirements.

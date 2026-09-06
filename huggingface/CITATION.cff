@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use Tiny Manas in research, please cite this release."
+title: "Tiny Manas: An Inspectable Kyrgyz Language Model Trained on the Epic Manas"
+type: software
+authors:
+  - family-names: Nosov
+    given-names: Nikita
+year: 2026
+date-released: 2026-09-06
+repository-code: "https://github.com/nik1t7n/tiny-manas"
+url: "https://huggingface.co/Nik1t7n/tiny-manas"
