@@ -12,6 +12,7 @@ from tokenizers import Tokenizer
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
+sys.dont_write_bytecode = True
 
 from manas_gpt.config import ModelConfig  # noqa: E402
 from manas_gpt.model import ManasGPT  # noqa: E402
